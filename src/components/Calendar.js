@@ -180,7 +180,7 @@ function Calendar() {
           return (
             <div
               key={task.id}
-              className={`flex items-start p-1 rounded-lg shadow-sm bg-white transition border-l-4 overflow-hidden ${
+              className={`flex items-start py-0.5 px-1 rounded-lg shadow-sm bg-white transition border-l-4 overflow-hidden ${
                 task.checked ? "border-green-400 opacity-60" : "border-blue-400"
               } relative`}
               style={{ 
@@ -200,13 +200,23 @@ function Calendar() {
                 className="w-3 h-3 accent-blue-500 mr-2 mt-1"
               />
               <div className="flex-1">
-                <div className={`font-medium text-[0.7rem] ${task.checked ? "line-through text-gray-400" : "text-gray-800"}`}>{task.title}</div>
-                <div className="text-[0.6rem] text-gray-400">
-                  {task.start} - {task.end} (
-                  {Math.floor(duration / 60) > 0 
-                    ? `${Math.floor(duration / 60)}h ${duration % 60 > 0 ? `${duration % 60}m` : ''}` 
-                    : `${duration}m`})
-                </div>
+                {duration < 30 ? (
+                  // For tasks under 30 minutes, hide timing text
+                  <div className="flex items-center">
+                    <div className={`font-medium text-[0.625rem] ${task.checked ? "line-through text-gray-400" : "text-gray-800"}`}>{task.title}</div>
+                  </div>
+                ) : (
+                  // For longer tasks, keep the original stacked layout
+                  <>
+                    <div className={`font-medium text-[0.625rem] ${task.checked ? "line-through text-gray-400" : "text-gray-800"}`}>{task.title}</div>
+                    <div className="text-[0.55rem] text-gray-400">
+                      {task.start} - {task.end} (
+                      {Math.floor(duration / 60) > 0 
+                        ? `${Math.floor(duration / 60)}h ${duration % 60 > 0 ? `${duration % 60}m` : ''}` 
+                        : `${duration}m`})
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           );
