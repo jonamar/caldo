@@ -98,22 +98,33 @@ function Calendar() {
   const calculateTimeRange = (taskList) => {
     if (!taskList || taskList.length === 0) return { startHour: 8, endHour: 18 }; // Default 8am-6pm if no tasks
     
-    let earliestTime = 24;
-    let latestTime = 0;
+    let earliestMinutes = 24 * 60;
+    let latestMinutes = 0;
     
     taskList.forEach(task => {
       const startHour = parseInt(task.start.split(':')[0]);
+      const startMin = parseInt(task.start.split(':')[1]);
       const endHour = parseInt(task.end.split(':')[0]);
-      const endMinutes = parseInt(task.end.split(':')[1]);
+      const endMin = parseInt(task.end.split(':')[1]);
       
-      earliestTime = Math.min(earliestTime, startHour);
-      // If end time has minutes, round up to the next hour
-      latestTime = Math.max(latestTime, endMinutes > 0 ? endHour + 1 : endHour);
+      // Convert to total minutes for more precise calculation
+      const startTotalMins = startHour * 60 + startMin;
+      const endTotalMins = endHour * 60 + endMin;
+      
+      earliestMinutes = Math.min(earliestMinutes, startTotalMins);
+      latestMinutes = Math.max(latestMinutes, endTotalMins);
     });
     
-    // Add buffer (round down to nearest hour for start, round up for end)
-    const startHour = Math.max(0, earliestTime - 1); // At least 1 hour buffer before
-    const endHour = Math.min(24, latestTime + 1); // At least 1 hour buffer after
+    // Add exactly 30 min buffer, distributed as 15 min before and 15 min after
+    const bufferMinutes = 15;
+    
+    // Calculate start and end times with buffer
+    const startMinutes = Math.max(0, earliestMinutes - bufferMinutes);
+    const endMinutes = Math.min(24 * 60, latestMinutes + bufferMinutes);
+    
+    // Convert back to hours, rounding to the nearest hour
+    const startHour = Math.floor(startMinutes / 60);
+    const endHour = Math.ceil(endMinutes / 60);
     
     return { startHour, endHour };
   };
@@ -123,7 +134,7 @@ function Calendar() {
   
   return (
     <div className="w-full max-w-md space-y-0 relative">
-      <div className="mb-2">
+      <div className="mb-2 relative z-30">
         <label htmlFor="date-select" className="block text-sm font-medium text-gray-700 mb-1">
           Select Date:
         </label>
@@ -132,33 +143,30 @@ function Calendar() {
           id="date-select"
           value={formatDateForInput(selectedDate)}
           onChange={handleDateChange}
-          className="w-full p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 relative z-30"
         />
       </div>
       
-      {/* Time range indicator */}
-      <div className="text-xs text-gray-500 mb-1">
-        Showing {timeRange.startHour}:00 - {timeRange.endHour}:00
-      </div>
+      {/* Time range is automatically calculated */}
       
-      {/* Time grid lines */}
+      {/* Time grid lines - skip first and last hour */}
       <div className="absolute left-0 top-[60px] bottom-0 w-12 border-r border-gray-200 pr-1 z-20">
-        {Array.from({ length: visibleHours + 1 }, (_, i) => (
+        {Array.from({ length: Math.max(0, visibleHours - 2) }, (_, i) => (
           <div key={`time-${i}`} className="relative">
-            <div className="absolute text-[0.6rem] text-gray-400 right-1" style={{ top: `${i * 60 * SCALE_FACTOR}px` }}>
-              {timeRange.startHour + i}:00
+            <div className="absolute text-[0.6rem] text-gray-400 right-1" style={{ top: `${(i+1) * 60 * SCALE_FACTOR}px` }}>
+              {timeRange.startHour + i + 1}:00
             </div>
           </div>
         ))}
       </div>
       
-      {/* Horizontal grid lines */}
+      {/* Horizontal grid lines - skip first and last hour */}
       <div className="absolute left-[48px] right-0 top-[60px] bottom-0 pointer-events-none">
-        {Array.from({ length: visibleHours + 1 }, (_, i) => (
+        {Array.from({ length: Math.max(0, visibleHours - 2) }, (_, i) => (
           <div 
             key={`grid-${i}`} 
             className="border-t border-gray-100" 
-            style={{ position: 'absolute', left: 0, right: 0, top: `${i * 60 * SCALE_FACTOR}px` }}
+            style={{ position: 'absolute', left: 0, right: 0, top: `${(i+1) * 60 * SCALE_FACTOR}px` }}
           />
         ))}
       </div>
