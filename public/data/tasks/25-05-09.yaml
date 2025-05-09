@@ -1,0 +1,23 @@
+- id: 1
+  title: Team Standup
+  start: "09:30"
+  end: "10:00"
+  checked: false
+
+- id: 2
+  title: Project Planning
+  start: "11:00"
+  end: "12:00"
+  checked: false
+
+- id: 3
+  title: Lunch Break
+  start: "12:30"
+  end: "13:30"
+  checked: false
+
+- id: 4
+  title: Development Work
+  start: "14:00"
+  end: "17:00"
+  checked: false

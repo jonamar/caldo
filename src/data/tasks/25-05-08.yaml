@@ -1,0 +1,23 @@
+- id: 1
+  title: Morning Meeting
+  start: "09:00"
+  end: "09:30"
+  checked: false
+
+- id: 2
+  title: Design Review
+  start: "10:00"
+  end: "11:00"
+  checked: false
+
+- id: 3
+  title: Lunch Break
+  start: "12:00"
+  end: "13:00"
+  checked: false
+
+- id: 4
+  title: Client Call
+  start: "14:00"
+  end: "15:00"
+  checked: false
