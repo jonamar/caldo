@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { loadTasksForDate, formatDateForFile, saveTasksForDate } from "../utils/taskLoader";
+import { 
+  loadTasksForDate, 
+  formatDateForFile, 
+  saveTasksForDate,
+  createTask,
+  updateTask,
+  deleteTask 
+} from "../utils/taskLoader";
 
 function Calendar() {
   const [tasks, setTasks] = useState([]);
@@ -21,25 +28,27 @@ function Calendar() {
     return () => clearInterval(timer);
   }, []);
   
+  // State for task form
+  const [showTaskForm, setShowTaskForm] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
+  const [newTask, setNewTask] = useState({
+    title: '',
+    start: '09:00',
+    end: '10:00'
+  });
+
   // Load tasks when the selected date changes
   useEffect(() => {
     const fetchTasks = async () => {
       setIsLoading(true);
       try {
-        // Format the date for the file name
+        // Format the date for storage
         const formattedDate = formatDateForFile(selectedDate);
         setDateString(formattedDate);
         
-        // Try to load from localStorage first (for tasks that were modified)
-        const savedTasks = localStorage.getItem(`tasks_${formattedDate}`);
-        
-        if (savedTasks) {
-          setTasks(JSON.parse(savedTasks));
-        } else {
-          // If not in localStorage, load from YAML file
-          const loadedTasks = await loadTasksForDate(formattedDate);
-          setTasks(loadedTasks);
-        }
+        // Load tasks from localStorage
+        const loadedTasks = await loadTasksForDate(formattedDate);
+        setTasks(loadedTasks);
       } catch (error) {
         console.error('Error loading tasks:', error);
         setTasks([]);
@@ -67,6 +76,88 @@ function Calendar() {
     
     // Save the updated tasks
     saveTasksForDate(dateString, updatedTasks);
+  };
+  
+  // Handle creating a new task
+  const handleCreateTask = async (e) => {
+    e.preventDefault();
+    
+    if (!newTask.title || !newTask.start || !newTask.end) {
+      alert('Please fill in all fields');
+      return;
+    }
+    
+    try {
+      // Create the task
+      await createTask(dateString, newTask);
+      
+      // Reload tasks
+      const loadedTasks = await loadTasksForDate(dateString);
+      setTasks(loadedTasks);
+      
+      // Reset form
+      setNewTask({
+        title: '',
+        start: '09:00',
+        end: '10:00'
+      });
+      setShowTaskForm(false);
+    } catch (error) {
+      console.error('Error creating task:', error);
+    }
+  };
+  
+  // Handle updating a task
+  const handleUpdateTask = async (e) => {
+    e.preventDefault();
+    
+    if (!editingTask || !editingTask.title || !editingTask.start || !editingTask.end) {
+      alert('Please fill in all fields');
+      return;
+    }
+    
+    try {
+      // Update the task
+      await updateTask(dateString, editingTask.id, editingTask);
+      
+      // Reload tasks
+      const loadedTasks = await loadTasksForDate(dateString);
+      setTasks(loadedTasks);
+      
+      // Reset form
+      setEditingTask(null);
+    } catch (error) {
+      console.error('Error updating task:', error);
+    }
+  };
+  
+  // Handle deleting a task
+  const handleDeleteTask = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this task?')) {
+      return;
+    }
+    
+    try {
+      // Delete the task
+      await deleteTask(dateString, id);
+      
+      // Reload tasks
+      const loadedTasks = await loadTasksForDate(dateString);
+      setTasks(loadedTasks);
+      
+      // If we were editing this task, close the form
+      if (editingTask && editingTask.id === id) {
+        setEditingTask(null);
+      }
+    } catch (error) {
+      console.error('Error deleting task:', error);
+    }
+  };
+  
+  // Start editing a task
+  const startEditTask = (task) => {
+    setEditingTask({...task});
+    setShowTaskForm(false);
   };
 
   // Format date for the date input
@@ -209,9 +300,20 @@ function Calendar() {
   return (
     <div className="w-full max-w-md space-y-0 relative">
       <div className="mb-1 relative z-30">
-        <label htmlFor="date-select" className="block text-sm font-medium text-gray-700 mb-1">
-          Select Date:
-        </label>
+        <div className="flex justify-between items-center">
+          <label htmlFor="date-select" className="block text-sm font-medium text-gray-700 mb-1">
+            Select Date:
+          </label>
+          <button 
+            onClick={() => {
+              setShowTaskForm(!showTaskForm);
+              setEditingTask(null);
+            }}
+            className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 transition"
+          >
+            {showTaskForm ? 'Cancel' : '+ Add Task'}
+          </button>
+        </div>
         <input
           type="date"
           id="date-select"
@@ -220,6 +322,113 @@ function Calendar() {
           className="w-full p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 relative z-30"
         />
       </div>
+      
+      {/* New Task Form */}
+      {showTaskForm && (
+        <div className="bg-white p-3 rounded-lg shadow-md mb-3 z-40 relative">
+          <h3 className="text-sm font-medium mb-2">Add New Task</h3>
+          <form onSubmit={handleCreateTask}>
+            <div className="mb-2">
+              <label className="block text-xs text-gray-700">Title</label>
+              <input
+                type="text"
+                value={newTask.title}
+                onChange={(e) => setNewTask({...newTask, title: e.target.value})}
+                className="w-full p-1 text-xs border border-gray-300 rounded"
+                placeholder="Task title"
+              />
+            </div>
+            <div className="flex space-x-2 mb-2">
+              <div className="flex-1">
+                <label className="block text-xs text-gray-700">Start Time</label>
+                <input
+                  type="time"
+                  value={newTask.start}
+                  onChange={(e) => setNewTask({...newTask, start: e.target.value})}
+                  className="w-full p-1 text-xs border border-gray-300 rounded"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-xs text-gray-700">End Time</label>
+                <input
+                  type="time"
+                  value={newTask.end}
+                  onChange={(e) => setNewTask({...newTask, end: e.target.value})}
+                  className="w-full p-1 text-xs border border-gray-300 rounded"
+                />
+              </div>
+            </div>
+            <button 
+              type="submit"
+              className="w-full bg-blue-500 text-white text-xs py-1 rounded hover:bg-blue-600 transition"
+            >
+              Add Task
+            </button>
+          </form>
+        </div>
+      )}
+      
+      {/* Edit Task Form */}
+      {editingTask && (
+        <div className="bg-white p-3 rounded-lg shadow-md mb-3 z-40 relative">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="text-sm font-medium">Edit Task</h3>
+            <button 
+              onClick={() => setEditingTask(null)}
+              className="text-xs text-gray-500 hover:text-gray-700"
+            >
+              Cancel
+            </button>
+          </div>
+          <form onSubmit={handleUpdateTask}>
+            <div className="mb-2">
+              <label className="block text-xs text-gray-700">Title</label>
+              <input
+                type="text"
+                value={editingTask.title}
+                onChange={(e) => setEditingTask({...editingTask, title: e.target.value})}
+                className="w-full p-1 text-xs border border-gray-300 rounded"
+                placeholder="Task title"
+              />
+            </div>
+            <div className="flex space-x-2 mb-2">
+              <div className="flex-1">
+                <label className="block text-xs text-gray-700">Start Time</label>
+                <input
+                  type="time"
+                  value={editingTask.start}
+                  onChange={(e) => setEditingTask({...editingTask, start: e.target.value})}
+                  className="w-full p-1 text-xs border border-gray-300 rounded"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-xs text-gray-700">End Time</label>
+                <input
+                  type="time"
+                  value={editingTask.end}
+                  onChange={(e) => setEditingTask({...editingTask, end: e.target.value})}
+                  className="w-full p-1 text-xs border border-gray-300 rounded"
+                />
+              </div>
+            </div>
+            <div className="flex space-x-2">
+              <button 
+                type="submit"
+                className="flex-1 bg-blue-500 text-white text-xs py-1 rounded hover:bg-blue-600 transition"
+              >
+                Update
+              </button>
+              <button 
+                type="button"
+                onClick={() => handleDeleteTask(editingTask.id)}
+                className="flex-1 bg-red-500 text-white text-xs py-1 rounded hover:bg-red-600 transition"
+              >
+                Delete
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
       
       {/* Time range is automatically calculated with 20min buffer above and 40min below */}
       
@@ -306,7 +515,7 @@ function Calendar() {
                 onChange={() => toggleCheck(task.id)}
                 className="w-3 h-3 accent-blue-500 mr-2 mt-1"
               />
-              <div className="flex-1">
+              <div className="flex-1 group">
                 {duration < 30 ? (
                   // For tasks under 30 minutes, hide timing text
                   <div className="flex items-center">
@@ -324,6 +533,14 @@ function Calendar() {
                     </div>
                   </>
                 )}
+                
+                {/* Edit button */}
+                <button 
+                  onClick={() => startEditTask(task)}
+                  className="absolute right-1 top-1 opacity-0 group-hover:opacity-100 transition text-[0.6rem] text-gray-400 hover:text-gray-600"
+                >
+                  Edit
+                </button>
               </div>
             </div>
           );
