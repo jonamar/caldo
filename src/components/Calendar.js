@@ -79,8 +79,8 @@ function Calendar() {
     const [hour, min] = start.split(':').map(Number);
     // Convert time to pixels with scaling factor, offset by the start hour
     const timeRange = calculateTimeRange(tasks);
-    // No additional offset needed - should align perfectly with grid
-    return ((hour - timeRange.startHour) * 60 + min) * SCALE_FACTOR;
+    // Apply a 30px offset to align cards better with the grid
+    return ((hour - timeRange.startHour) * 60 + min) * SCALE_FACTOR - 30;
   };
 
   // Calculate height based on duration
