@@ -226,11 +226,12 @@ function Calendar() {
       {/* Current time indicator */}
       {isCurrentTimeVisible() && (
         <div 
-          className="absolute border-t-2 border-red-500 z-25 pointer-events-none"
+          className="absolute border-t-2 border-red-500 pointer-events-none"
           style={{ 
             top: `${calculateCurrentTimePosition()}px`,
             left: `${TIME_COLUMN_WIDTH}px`,
-            right: 0
+            right: 0,
+            zIndex: 1000 // Very high z-index to ensure it's above all task cards
           }}
         />
       )}
