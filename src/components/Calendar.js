@@ -6,7 +6,21 @@ function Calendar() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [dateString, setDateString] = useState(formatDateForFile());
+  const [currentTime, setCurrentTime] = useState(new Date());
 
+  // Update current time every minute
+  useEffect(() => {
+    // Set initial time
+    setCurrentTime(new Date());
+    
+    // Update time every minute
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // 60000ms = 1 minute
+    
+    return () => clearInterval(timer);
+  }, []);
+  
   // Load tasks when the selected date changes
   useEffect(() => {
     const fetchTasks = async () => {
@@ -71,16 +85,35 @@ function Calendar() {
     return endMinutes - startMinutes;
   };
   
-  // Scale factor for the grid (pixels per minute)
+  // Calendar constants and configuration
   const SCALE_FACTOR = 2; // 2px per minute = 120px per hour
+  const HEADER_HEIGHT = 60; // Height of the date selector area
+  const TIME_COLUMN_WIDTH = 48; // Width of the time markers column
+  const TASK_BUFFER = 8; // Buffer space for tasks
   
-  // Calculate position based on start time, adjusted for the visible time range
-  const calculatePosition = (start) => {
-    const [hour, min] = start.split(':').map(Number);
-    // Convert time to pixels with scaling factor, offset by the start hour
+  // Single source of truth for all time-to-position calculations
+  const timeToPosition = (hours, minutes, options = {}) => {
+    const { includeHeaderOffset = true, applyTaskOffset = false } = options;
     const timeRange = calculateTimeRange(tasks);
-    // Apply a 30px offset to align cards better with the grid
-    return ((hour - timeRange.startHour) * 60 + min) * SCALE_FACTOR - 30;
+    
+    // Calculate minutes from the start of the visible range
+    const minutesFromStart = (hours - timeRange.startHour) * 60 + minutes;
+    
+    // Convert to pixels
+    let position = minutesFromStart * SCALE_FACTOR;
+    
+    // Add header offset if needed
+    if (includeHeaderOffset) {
+      position += HEADER_HEIGHT;
+    }
+    
+    return position;
+  };
+  
+  // Calculate position for a task based on its start time
+  const calculateTaskPosition = (start) => {
+    const [hour, min] = start.split(':').map(Number);
+    return timeToPosition(hour, min);
   };
 
   // Calculate height based on duration
@@ -95,6 +128,40 @@ function Calendar() {
   };
 
   // Calculate the earliest and latest times for the day's tasks
+  // Check if current time is within the visible range
+  const isCurrentTimeVisible = () => {
+    // Only show if we're viewing today's date
+    if (!isSameDay(selectedDate, new Date())) return false;
+    
+    const now = currentTime;
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    
+    // Convert current time to minutes
+    const currentTimeInMinutes = currentHour * 60 + currentMinute;
+    
+    // Check if current time falls within the visible range
+    return currentHour >= timeRange.startHour && currentHour < timeRange.endHour;
+  };
+  
+  // Calculate the position for the current time indicator
+  const calculateCurrentTimePosition = () => {
+    const now = currentTime;
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    
+    return timeToPosition(currentHour, currentMinute);
+  };
+  
+  // Check if two dates are the same day
+  const isSameDay = (date1, date2) => {
+    return (
+      date1.getFullYear() === date2.getFullYear() &&
+      date1.getMonth() === date2.getMonth() &&
+      date1.getDate() === date2.getDate()
+    );
+  };
+  
   const calculateTimeRange = (taskList) => {
     if (!taskList || taskList.length === 0) return { startHour: 8, endHour: 18 }; // Default 8am-6pm if no tasks
     
@@ -149,11 +216,28 @@ function Calendar() {
       
       {/* Time range is automatically calculated */}
       
+      {/* Current time indicator */}
+      {isCurrentTimeVisible() && (
+        <div 
+          className="absolute border-t-2 border-red-500 z-25 pointer-events-none"
+          style={{ 
+            top: `${calculateCurrentTimePosition()}px`,
+            left: `${TIME_COLUMN_WIDTH}px`,
+            right: 0
+          }}
+        />
+      )}
+      
       {/* Time grid lines - skip first and last hour */}
       <div className="absolute left-0 top-[60px] bottom-0 w-12 border-r border-gray-200 pr-1 z-20">
         {Array.from({ length: Math.max(0, visibleHours - 2) }, (_, i) => (
           <div key={`time-${i}`} className="relative">
-            <div className="absolute text-[0.6rem] text-gray-400 right-1" style={{ top: `${(i+1) * 60 * SCALE_FACTOR}px` }}>
+            <div 
+              className="absolute text-[0.6rem] text-gray-400 right-1" 
+              style={{ 
+                top: `${timeToPosition(timeRange.startHour + i + 1, 0, { includeHeaderOffset: false })}px` 
+              }}
+            >
               {timeRange.startHour + i + 1}:00
             </div>
           </div>
@@ -166,12 +250,22 @@ function Calendar() {
           <div 
             key={`grid-${i}`} 
             className="border-t border-gray-100" 
-            style={{ position: 'absolute', left: 0, right: 0, top: `${(i+1) * 60 * SCALE_FACTOR}px` }}
+            style={{ 
+              position: 'absolute', 
+              left: 0, 
+              right: 0, 
+              top: `${timeToPosition(timeRange.startHour + i + 1, 0, { includeHeaderOffset: false })}px` 
+            }}
           />
         ))}
       </div>
       
-      <div className="pt-[60px]" style={{ height: `${visibleHours * 60 * SCALE_FACTOR}px`, position: 'relative', marginLeft: '48px' }}>
+      <div style={{ 
+        height: `${visibleHours * 60 * SCALE_FACTOR + HEADER_HEIGHT}px`, 
+        position: 'relative', 
+        marginLeft: `${TIME_COLUMN_WIDTH}px`,
+        paddingTop: `${HEADER_HEIGHT}px`
+      }}>
         {isLoading ? (
           <div className="text-center py-2">Loading tasks...</div>
         ) : tasks.length === 0 ? (
@@ -180,10 +274,7 @@ function Calendar() {
           tasks.map((task) => {
           const duration = calculateDuration(task.start, task.end);
           const height = calculateHeight(duration);
-          const position = calculatePosition(task.start);
-          
-          // Create visual buffer between tasks
-          const taskBuffer = 8; // Increased buffer size
+          const position = calculateTaskPosition(task.start);
           
           return (
             <div
@@ -192,9 +283,9 @@ function Calendar() {
                 task.checked ? "border-green-400 opacity-60" : "border-blue-400"
               } relative`}
               style={{ 
-                height: `${height - (taskBuffer * 2)}px`, // Fixed height instead of minHeight
+                height: `${height - (TASK_BUFFER * 2)}px`, // Fixed height instead of minHeight
                 position: 'absolute',
-                top: `${position + taskBuffer}px`, // Add buffer to top position
+                top: `${position}px`,
                 left: 0,
                 right: 0,
                 zIndex: task.id, // Use task ID for z-index to maintain consistent stacking
