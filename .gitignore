@@ -31,3 +31,7 @@ yarn-error.log*
 # cache
 .eslintcache
 .cache/
+
+# data privacy
+*.yaml
+*.yml   
