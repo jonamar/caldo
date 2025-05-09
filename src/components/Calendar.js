@@ -73,10 +73,10 @@ function Calendar() {
 
   // Calculate height based on duration (15 min chunks)
   const calculateHeight = (duration) => {
-    // Base height for all tasks
-    const baseHeight = 40; 
+    // Base height for all tasks (reduced for better scaling)
+    const baseHeight = 32; 
     // Additional height per 15 minutes (in pixels)
-    const heightPer15Min = 8;
+    const heightPer15Min = 10;
     // Number of 15-minute chunks
     const chunks = Math.ceil(duration / 15);
     
@@ -110,7 +110,7 @@ function Calendar() {
           return (
             <div
               key={task.id}
-              className={`flex items-start p-2 rounded-lg shadow-sm bg-white transition border-l-4 ${
+              className={`flex items-start p-1.5 rounded-lg shadow-sm bg-white transition border-l-4 ${
                 task.checked ? "border-green-400 opacity-60" : "border-blue-400"
               }`}
               style={{ minHeight: `${height}px` }}
@@ -123,7 +123,7 @@ function Calendar() {
               />
               <div className="flex-1">
                 <div className={`font-medium text-sm ${task.checked ? "line-through text-gray-400" : "text-gray-800"}`}>{task.title}</div>
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-gray-400 text-[0.65rem]">
                   {task.start} - {task.end} ({Math.floor(duration / 60)}h {duration % 60}m)
                 </div>
               </div>
