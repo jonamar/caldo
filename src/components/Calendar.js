@@ -87,17 +87,18 @@ function Calendar() {
   
   // Calendar constants and configuration
   const SCALE_FACTOR = 2; // 2px per minute = 120px per hour
-  const HEADER_HEIGHT = 60; // Height of the date selector area
+  const HEADER_HEIGHT = 30; // Minimal height of the date selector area
   const TIME_COLUMN_WIDTH = 48; // Width of the time markers column
-  const TASK_BUFFER = 8; // Buffer space for tasks
+  const TASK_BUFFER = 4; // Reduced buffer space for tasks
+  const TOP_PADDING = 5; // Extremely minimal padding at the top of the calendar
   
   // Single source of truth for all time-to-position calculations
   const timeToPosition = (hours, minutes, options = {}) => {
     const { includeHeaderOffset = true, applyTaskOffset = false } = options;
     const timeRange = calculateTimeRange(tasks);
     
-    // Calculate minutes from the start of the visible range
-    const minutesFromStart = (hours - timeRange.startHour) * 60 + minutes;
+    // Calculate minutes from the start of the visible range, accounting for partial hour start
+    const minutesFromStart = (hours - timeRange.startHour) * 60 + minutes - (timeRange.startMinuteRemainder || 0);
     
     // Convert to pixels
     let position = minutesFromStart * SCALE_FACTOR;
@@ -182,18 +183,24 @@ function Calendar() {
       latestMinutes = Math.max(latestMinutes, endTotalMins);
     });
     
-    // Add exactly 30 min buffer, distributed as 15 min before and 15 min after
-    const bufferMinutes = 15;
+    // Absolute minimal buffer: 2 minutes above, 10 minutes below
+    const topBufferMinutes = 2;
+    const bottomBufferMinutes = 10;
     
     // Calculate start and end times with buffer
-    const startMinutes = Math.max(0, earliestMinutes - bufferMinutes);
-    const endMinutes = Math.min(24 * 60, latestMinutes + bufferMinutes);
+    const startMinutes = Math.max(0, earliestMinutes - topBufferMinutes);
+    const endMinutes = Math.min(24 * 60, latestMinutes + bottomBufferMinutes);
     
-    // Convert back to hours, rounding to the nearest hour
+    // Convert back to hours
     const startHour = Math.floor(startMinutes / 60);
+    const startMinuteRemainder = startMinutes % 60;
     const endHour = Math.ceil(endMinutes / 60);
     
-    return { startHour, endHour };
+    return { 
+      startHour, 
+      startMinuteRemainder,
+      endHour 
+    };
   };
   
   const timeRange = calculateTimeRange(tasks);
@@ -201,7 +208,7 @@ function Calendar() {
   
   return (
     <div className="w-full max-w-md space-y-0 relative">
-      <div className="mb-2 relative z-30">
+      <div className="mb-1 relative z-30">
         <label htmlFor="date-select" className="block text-sm font-medium text-gray-700 mb-1">
           Select Date:
         </label>
@@ -214,7 +221,7 @@ function Calendar() {
         />
       </div>
       
-      {/* Time range is automatically calculated */}
+      {/* Time range is automatically calculated with 20min buffer above and 40min below */}
       
       {/* Current time indicator */}
       {isCurrentTimeVisible() && (
@@ -229,7 +236,7 @@ function Calendar() {
       )}
       
       {/* Time grid lines - skip first and last hour */}
-      <div className="absolute left-0 top-[60px] bottom-0 w-12 border-r border-gray-200 pr-1 z-20">
+      <div className="absolute left-0 top-[30px] bottom-0 w-12 border-r border-gray-200 pr-1 z-20">
         {Array.from({ length: Math.max(0, visibleHours - 2) }, (_, i) => (
           <div key={`time-${i}`} className="relative">
             <div 
@@ -245,7 +252,7 @@ function Calendar() {
       </div>
       
       {/* Horizontal grid lines - skip first and last hour */}
-      <div className="absolute left-[48px] right-0 top-[60px] bottom-0 pointer-events-none">
+      <div className="absolute left-[48px] right-0 top-[30px] bottom-0 pointer-events-none">
         {Array.from({ length: Math.max(0, visibleHours - 2) }, (_, i) => (
           <div 
             key={`grid-${i}`} 
@@ -261,10 +268,10 @@ function Calendar() {
       </div>
       
       <div style={{ 
-        height: `${visibleHours * 60 * SCALE_FACTOR + HEADER_HEIGHT}px`, 
+        height: `${visibleHours * 60 * SCALE_FACTOR + TOP_PADDING}px`, 
         position: 'relative', 
         marginLeft: `${TIME_COLUMN_WIDTH}px`,
-        paddingTop: `${HEADER_HEIGHT}px`
+        paddingTop: `${TOP_PADDING}px`
       }}>
         {isLoading ? (
           <div className="text-center py-2">Loading tasks...</div>
