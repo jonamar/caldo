@@ -79,6 +79,7 @@ function Calendar() {
     const [hour, min] = start.split(':').map(Number);
     // Convert time to pixels with scaling factor, offset by the start hour
     const timeRange = calculateTimeRange(tasks);
+    // No additional offset needed - should align perfectly with grid
     return ((hour - timeRange.startHour) * 60 + min) * SCALE_FACTOR;
   };
 
@@ -89,6 +90,7 @@ function Calendar() {
     const minHeight = 32;
     const durationHeight = duration * SCALE_FACTOR;
     
+    // We'll use the exact duration height to maintain grid alignment
     return Math.max(minHeight, durationHeight);
   };
 
@@ -172,30 +174,34 @@ function Calendar() {
           const height = calculateHeight(duration);
           const position = calculatePosition(task.start);
           
+          // Create visual buffer between tasks
+          const taskBuffer = 8; // Increased buffer size
+          
           return (
             <div
               key={task.id}
-              className={`flex items-start p-1.5 rounded-lg shadow-sm bg-white transition border-l-4 overflow-hidden ${
+              className={`flex items-start p-1 rounded-lg shadow-sm bg-white transition border-l-4 overflow-hidden ${
                 task.checked ? "border-green-400 opacity-60" : "border-blue-400"
-              } mb-1.5 relative`}
+              } relative`}
               style={{ 
-                minHeight: `${height}px`,
+                height: `${height - (taskBuffer * 2)}px`, // Fixed height instead of minHeight
                 position: 'absolute',
-                top: `${position}px`,
+                top: `${position + taskBuffer}px`, // Add buffer to top position
                 left: 0,
                 right: 0,
-                zIndex: 10
+                zIndex: task.id, // Use task ID for z-index to maintain consistent stacking
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)' // Add subtle shadow for depth
               }}
             >
               <input
                 type="checkbox"
                 checked={task.checked}
                 onChange={() => toggleCheck(task.id)}
-                className="w-4 h-4 accent-blue-500 mr-2 mt-1"
+                className="w-3 h-3 accent-blue-500 mr-2 mt-1"
               />
               <div className="flex-1">
-                <div className={`font-medium text-sm ${task.checked ? "line-through text-gray-400" : "text-gray-800"}`}>{task.title}</div>
-                <div className="text-xs text-gray-400 text-[0.65rem]">
+                <div className={`font-medium text-[0.7rem] ${task.checked ? "line-through text-gray-400" : "text-gray-800"}`}>{task.title}</div>
+                <div className="text-[0.6rem] text-gray-400">
                   {task.start} - {task.end} (
                   {Math.floor(duration / 60) > 0 
                     ? `${Math.floor(duration / 60)}h ${duration % 60 > 0 ? `${duration % 60}m` : ''}` 
