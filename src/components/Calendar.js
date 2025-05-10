@@ -138,19 +138,36 @@ function Calendar() {
     }
     
     try {
-      // Delete the task
-      await deleteTask(dateString, id);
+      console.log('Attempting to delete task with ID:', id);
       
-      // Reload tasks
-      const loadedTasks = await loadTasksForDate(dateString);
-      setTasks(loadedTasks);
+      // Get current tasks
+      const currentTasks = [...tasks];
       
-      // If we were editing this task, close the form
-      if (editingTask && editingTask.id === id) {
+      // Filter out the task to delete directly
+      const updatedTasks = currentTasks.filter(task => task.id.toString() !== id.toString());
+      
+      // Check if any task was removed
+      if (updatedTasks.length === currentTasks.length) {
+        console.error('No task found with ID:', id);
+        return;
+      }
+      
+      // Update state first for immediate UI feedback
+      setTasks(updatedTasks);
+      
+      // Close edit form if we were editing this task
+      if (editingTask && editingTask.id.toString() === id.toString()) {
         setEditingTask(null);
       }
+      
+      // Then persist to localStorage
+      await saveTasksForDate(dateString, updatedTasks);
+      console.log('Task deleted successfully');
     } catch (error) {
       console.error('Error deleting task:', error);
+      // Reload tasks to ensure UI is in sync with storage
+      const loadedTasks = await loadTasksForDate(dateString);
+      setTasks(loadedTasks);
     }
   };
   
@@ -420,7 +437,17 @@ function Calendar() {
               </button>
               <button 
                 type="button"
-                onClick={() => handleDeleteTask(editingTask.id)}
+                onClick={(e) => {
+                  e.preventDefault(); // Prevent form submission
+                  e.stopPropagation(); // Stop event propagation
+                  console.log('Delete button clicked', editingTask);
+                  if (editingTask && editingTask.id) {
+                    // Call handleDeleteTask directly without using the imported deleteTask function
+                    handleDeleteTask(editingTask.id);
+                  } else {
+                    console.error('No task ID available for deletion');
+                  }
+                }}
                 className="flex-1 bg-red-500 text-white text-xs py-1 rounded hover:bg-red-600 transition"
               >
                 Delete

@@ -213,7 +213,12 @@ export const deleteTask = async (date, taskId) => {
     const tasks = await loadTasksForDate(date);
     
     // Filter out the task to delete
-    const updatedTasks = tasks.filter(t => t.id !== taskId);
+    const updatedTasks = tasks.filter(t => t.id.toString() !== taskId.toString());
+    
+    // Check if any task was actually removed
+    if (updatedTasks.length === tasks.length) {
+      console.warn(`No task with ID ${taskId} found to delete`);
+    }
     
     // Save updated tasks
     return saveTasksForDate(date, updatedTasks);
