@@ -8,7 +8,8 @@ A simple, mobile-optimized React calendar web app that displays tasks with start
 - Tasks sized proportionally to their duration
 - Simple task check-off functionality
 - Clean UI using Tailwind CSS
-- YAML-based data layer for easy task management
+- LocalStorage-based data storage for easy task management
+- CLI tool for quick task updates
 
 ## Getting Started
 
@@ -29,60 +30,95 @@ A simple, mobile-optimized React calendar web app that displays tasks with start
    npm start
    ```
 
-## YAML Data Structure
+## Data Storage
 
-The app uses YAML files to store task data. Each day's tasks are stored in a separate YAML file named in the format `yy-mm-dd.yaml` (e.g., `25-05-09.yaml` for May 9, 2025).
+The app uses localStorage to store task data. Each day's tasks are stored with keys in the format `tasks_yy-mm-dd` (e.g., `tasks_25-05-12` for May 12, 2025).
 
-### File Location
+### Task Structure
 
-YAML files should be placed in two locations:
-- Source files: `/src/data/tasks/`
-- Public files: `/public/data/tasks/`
+Each task has the following properties:
 
-When editing task data, always edit the source file first, then copy it to the public directory.
-
-### YAML Structure
-
-Each task in the YAML file should have the following properties:
-
-```yaml
-- id: 1                      # Unique identifier for the task
-  title: "Task Title"        # Title/description of the task
-  start: "09:00"             # Start time in 24-hour format (HH:MM)
-  end: "10:30"               # End time in 24-hour format (HH:MM)
-  checked: false             # Whether the task is completed (true/false)
-```
-
-Example of a complete YAML file:
-
-```yaml
-- id: 1
-  title: "Morning Meeting"
-  start: "09:00"
-  end: "09:30"
-  checked: false
-
-- id: 2
-  title: "Project Planning"
-  start: "10:00"
-  end: "11:00"
-  checked: false
+```javascript
+{
+  id: "1",                // Unique identifier for the task (string)
+  title: "Task Title",    // Title/description of the task
+  start: "09:00",        // Start time in 24-hour format (HH:MM)
+  end: "10:30",          // End time in 24-hour format (HH:MM)
+  checked: false         // Whether the task is completed (boolean)
+}
 ```
 
 ### Task Duration Visualization
 
-The app automatically calculates the duration of each task and sizes the task cards accordingly. Tasks are sized in 15-minute increments, with longer tasks appearing larger in the UI.
+The app automatically calculates the duration of each task and sizes the task cards accordingly. Tasks are sized proportionally to their duration, with longer tasks appearing larger in the UI.
 
-### Editing Tasks
+## Task Management Tools
 
-To edit or add tasks:
+The app includes two powerful tools for managing tasks:
 
-1. Edit the YAML file in the source directory (`/src/data/tasks/`)
-2. Copy the updated file to the public directory:
-   ```
-   cp /src/data/tasks/yy-mm-dd.yaml /public/data/tasks/yy-mm-dd.yaml
-   ```
-3. Refresh the browser to see your changes
+### 1. Task Scheduler Utility
+
+The `src/utils/taskScheduler.js` module provides functions to easily schedule and update tasks programmatically:
+
+```javascript
+import { updateTasksFromPriorities, createPriorityTask } from './utils/taskScheduler';
+
+// Define your priorities
+const priorities = [
+  createPriorityTask('Apply to easy job application #1', 15),
+  createPriorityTask('Apply to easy job application #2', 15),
+  createPriorityTask('Apply to medium difficulty job application', 30),
+  createPriorityTask('Call the glasses store', 15),
+  createPriorityTask('Rest time', 45)
+];
+
+// Update today's tasks for time window 2:45-4:30 PM
+updateTasksFromPriorities(priorities, '14:45', '16:30');
+```
+
+### 2. Command Line Interface (CLI)
+
+The app includes a CLI tool (`scripts/update-tasks.js`) that allows you to update tasks directly from the command line:
+
+#### Schedule Tasks Based on Priorities
+
+Automatically schedule tasks within a time window based on their durations:
+
+```bash
+node scripts/update-tasks.js schedule --start "14:45" --end "16:30" --tasks "Apply to easy job application #1:15,Apply to easy job application #2:15,Apply to medium difficulty job application:30,Call the glasses store:15,Rest time:45"
+```
+
+Format: `Task Title:DurationInMinutes,Task Title:DurationInMinutes,...`
+
+#### Directly Set Tasks
+
+Set specific tasks with exact start and end times:
+
+```bash
+node scripts/update-tasks.js set --tasks '[{"title":"Task 1","start":"09:00","end":"10:00"},{"title":"Task 2","start":"10:30","end":"11:30"}]'
+```
+
+#### Clear All Tasks
+
+Remove all tasks for today:
+
+```bash
+node scripts/update-tasks.js clear
+```
+
+### Example: Updating Today's Schedule
+
+To update today's tasks with a schedule for 2:45-4:30 PM:
+
+```bash
+node scripts/update-tasks.js schedule --start "14:45" --end "16:30" --tasks "Apply to easy job application #1:15,Apply to easy job application #2:15,Apply to medium difficulty job application:30,Call the glasses store:15,Rest time:45"
+```
+
+This will automatically:
+1. Create tasks with the specified titles
+2. Calculate appropriate start and end times within the given window
+3. Save them to localStorage
+4. Display the created schedule in the console
 
 ## License
 
