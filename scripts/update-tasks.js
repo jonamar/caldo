@@ -16,38 +16,21 @@
  * node update-tasks.js clear
  */
 
-// Mock localStorage for Node.js environment
-const fs = require('fs');
-const path = require('path');
+const axios = require('axios');
 
-// Path to store the localStorage data
-const DATA_DIR = path.join(__dirname, '../.local-storage');
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
+// Caldo server config
+const SERVER_URL = process.env.CALDO_SERVER_URL || 'http://localhost:3111';
 
-// Mock localStorage implementation
-const localStorage = {
-  getItem: (key) => {
-    try {
-      const filePath = path.join(DATA_DIR, `${key}.json`);
-      if (fs.existsSync(filePath)) {
-        return fs.readFileSync(filePath, 'utf8');
-      }
-      return null;
-    } catch (error) {
-      console.error(`Error reading item ${key}:`, error);
-      return null;
-    }
-  },
-  setItem: (key, value) => {
-    try {
-      const filePath = path.join(DATA_DIR, `${key}.json`);
-      fs.writeFileSync(filePath, value, 'utf8');
-    } catch (error) {
-      console.error(`Error writing item ${key}:`, error);
-    }
-  }
+// Helper functions for server API
+const getTasks = async (dateString) => {
+  const res = await axios.get(`${SERVER_URL}/tasks/${dateString}`);
+  return res.data;
+};
+const setTasks = async (dateString, tasks) => {
+  await axios.post(`${SERVER_URL}/tasks/${dateString}`, tasks);
+};
+const clearTasks = async (dateString) => {
+  await axios.delete(`${SERVER_URL}/tasks/${dateString}`);
 };
 
 // Format date to yy-mm-dd
@@ -111,107 +94,105 @@ if (!command) {
   process.exit(1);
 }
 
-// Initialize localStorage if needed
-localStorage.setItem('caldo_initialized', 'true');
-
 // Get today's date
 const today = formatDateForFile();
 
-// Process commands
-switch (command) {
-  case 'schedule': {
-    // Parse arguments
-    let startTime = '09:00';
-    let endTime = '17:00';
-    let tasksString = '';
-    
-    for (let i = 1; i < args.length; i += 2) {
-      if (args[i] === '--start' && args[i + 1]) {
-        startTime = args[i + 1];
-      } else if (args[i] === '--end' && args[i + 1]) {
-        endTime = args[i + 1];
-      } else if (args[i] === '--tasks' && args[i + 1]) {
-        tasksString = args[i + 1];
+(async () => {
+  switch (command) {
+    case 'schedule': {
+      // Parse arguments
+      let startTime = '09:00';
+      let endTime = '17:00';
+      let tasksString = '';
+      
+      for (let i = 1; i < args.length; i += 2) {
+        if (args[i] === '--start' && args[i + 1]) {
+          startTime = args[i + 1];
+        } else if (args[i] === '--end' && args[i + 1]) {
+          endTime = args[i + 1];
+        } else if (args[i] === '--tasks' && args[i + 1]) {
+          tasksString = args[i + 1];
+        }
       }
-    }
-    
-    if (!tasksString) {
-      console.error('Please provide tasks in the format: "Task 1:15,Task 2:30"');
-      process.exit(1);
-    }
-    
-    // Parse tasks
-    const priorityTasks = tasksString.split(',').map(taskStr => {
-      const [title, durationStr] = taskStr.split(':');
-      const durationMinutes = parseInt(durationStr, 10);
-      return { title, durationMinutes };
-    });
-    
-    // Schedule tasks
-    const scheduledTasks = scheduleTasks(priorityTasks, startTime, endTime);
-    
-    // Save to localStorage
-    localStorage.setItem(`tasks_${today}`, JSON.stringify(scheduledTasks));
-    
-    console.log(`Successfully scheduled ${scheduledTasks.length} tasks for today (${today})`);
-    console.log('Tasks:');
-    scheduledTasks.forEach(task => {
-      console.log(`- ${task.title}: ${task.start} - ${task.end}`);
-    });
-    break;
-  }
-  
-  case 'set': {
-    // Parse arguments
-    let tasksJson = '';
-    
-    for (let i = 1; i < args.length; i += 2) {
-      if (args[i] === '--tasks' && args[i + 1]) {
-        tasksJson = args[i + 1];
+      
+      if (!tasksString) {
+        console.error('Please provide tasks in the format: "Task 1:15,Task 2:30"');
+        process.exit(1);
       }
-    }
-    
-    if (!tasksJson) {
-      console.error('Please provide tasks as a JSON array');
-      process.exit(1);
-    }
-    
-    try {
+      
       // Parse tasks
-      const tasks = JSON.parse(tasksJson);
+      const priorityTasks = tasksString.split(',').map(taskStr => {
+        const [title, durationStr] = taskStr.split(':');
+        const durationMinutes = parseInt(durationStr, 10);
+        return { title, durationMinutes };
+      });
       
-      // Add IDs and checked status if not present
-      const formattedTasks = tasks.map((task, index) => ({
-        id: task.id || (index + 1).toString(),
-        title: task.title,
-        start: task.start,
-        end: task.end,
-        checked: task.checked !== undefined ? task.checked : false
-      }));
+      // Schedule tasks
+      const scheduledTasks = scheduleTasks(priorityTasks, startTime, endTime);
       
-      // Save to localStorage
-      localStorage.setItem(`tasks_${today}`, JSON.stringify(formattedTasks));
+      // Save to server
+      await setTasks(today, scheduledTasks);
       
-      console.log(`Successfully set ${formattedTasks.length} tasks for today (${today})`);
+      console.log(`Successfully scheduled ${scheduledTasks.length} tasks for today (${today})`);
       console.log('Tasks:');
-      formattedTasks.forEach(task => {
+      scheduledTasks.forEach(task => {
         console.log(`- ${task.title}: ${task.start} - ${task.end}`);
       });
-    } catch (error) {
-      console.error('Error parsing tasks JSON:', error);
-      process.exit(1);
+      break;
     }
-    break;
+    
+    case 'set': {
+      // Parse arguments
+      let tasksJson = '';
+      
+      for (let i = 1; i < args.length; i += 2) {
+        if (args[i] === '--tasks' && args[i + 1]) {
+          tasksJson = args[i + 1];
+        }
+      }
+      
+      if (!tasksJson) {
+        console.error('Please provide tasks as a JSON array');
+        process.exit(1);
+      }
+      
+      try {
+        // Parse tasks
+        const tasks = JSON.parse(tasksJson);
+        
+        // Add IDs and checked status if not present
+        const formattedTasks = tasks.map((task, index) => ({
+          id: task.id || (index + 1).toString(),
+          title: task.title,
+          start: task.start,
+          end: task.end,
+          checked: task.checked !== undefined ? task.checked : false
+        }));
+        
+        // Save to server
+        await setTasks(today, formattedTasks);
+        
+        console.log(`Successfully set ${formattedTasks.length} tasks for today (${today})`);
+        console.log('Tasks:');
+        formattedTasks.forEach(task => {
+          console.log(`- ${task.title}: ${task.start} - ${task.end}`);
+        });
+      } catch (error) {
+        console.error('Error parsing tasks JSON:', error);
+        process.exit(1);
+      }
+      break;
+    }
+    
+    case 'clear': {
+      // Clear tasks for today via server
+      await clearTasks(today);
+      console.log(`Successfully cleared all tasks for today (${today})`);
+      break;
+    }
+    
+    default:
+      console.error('Unknown command. Please use schedule, set, or clear');
+      process.exit(1);
   }
-  
-  case 'clear': {
-    // Clear tasks for today
-    localStorage.setItem(`tasks_${today}`, JSON.stringify([]));
-    console.log(`Successfully cleared all tasks for today (${today})`);
-    break;
-  }
-  
-  default:
-    console.error('Unknown command. Please use schedule, set, or clear');
-    process.exit(1);
-}
+})();
