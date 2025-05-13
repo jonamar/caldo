@@ -459,18 +459,89 @@ function Calendar() {
       
       {/* Time range is automatically calculated with 20min buffer above and 40min below */}
       
-      {/* Current time indicator */}
-      {isCurrentTimeVisible() && (
-        <div 
-          className="absolute border-t-2 border-red-500 pointer-events-none"
-          style={{ 
-            top: `${calculateCurrentTimePosition()}px`,
-            left: `${TIME_COLUMN_WIDTH}px`,
-            right: 0,
-            zIndex: 1000 // Very high z-index to ensure it's above all task cards
-          }}
-        />
-      )}
+      {/* Task card container, now also holds the current time indicator */}
+      <div style={{ 
+        height: `${visibleHours * 60 * SCALE_FACTOR + TOP_PADDING}px`, 
+        position: 'relative', 
+        marginLeft: `${TIME_COLUMN_WIDTH}px`,
+        paddingTop: `${TOP_PADDING}px`
+      }}>
+        {/* Current time indicator (red line) - must be inside this container */}
+        {isCurrentTimeVisible() && (
+          <div 
+            className="absolute border-t-2 border-red-500 pointer-events-none"
+            style={{ 
+              top: `${timeToPosition(currentTime.getHours(), currentTime.getMinutes(), { includeHeaderOffset: false })}px`,
+              left: 0,
+              right: 0,
+              zIndex: 1000
+            }}
+          />
+        )}
+
+        {isLoading ? (
+          <div className="text-center py-2">Loading tasks...</div>
+        ) : tasks.length === 0 ? (
+          <div className="text-center py-2 text-gray-500">No tasks for this date</div>
+        ) : (
+          tasks.map((task) => {
+            const duration = calculateDuration(task.start, task.end);
+            const height = calculateHeight(duration);
+            const position = calculateTaskPosition(task.start);
+            
+            return (
+              <div
+                key={task.id}
+                className={`flex items-start py-0.5 px-1 rounded-lg shadow-sm bg-white transition border-l-4 overflow-hidden ${
+                  task.checked ? "border-green-400 opacity-60" : "border-blue-400"
+                } relative`}
+                style={{ 
+                  height: `${height - (TASK_BUFFER * 2)}px`, // Fixed height instead of minHeight
+                  position: 'absolute',
+                  top: `${position}px`,
+                  left: 0,
+                  right: 0,
+                  zIndex: task.id, // Use task ID for z-index to maintain consistent stacking
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)' // Add subtle shadow for depth
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={task.checked}
+                  onChange={() => toggleCheck(task.id)}
+                  className="w-3 h-3 accent-blue-500 mr-2 mt-1"
+                />
+                <div className="flex-1 group">
+                  {duration < 30 ? (
+                    // For tasks under 30 minutes, hide timing text
+                    <div className="flex items-center">
+                      <div className={`font-medium text-[0.625rem] ${task.checked ? "line-through text-gray-400" : "text-gray-800"}`}>{task.title}</div>
+                    </div>
+                  ) : (
+                    // For longer tasks, keep the original stacked layout
+                    <>
+                      <div className={`font-medium text-[0.625rem] ${task.checked ? "line-through text-gray-400" : "text-gray-800"}`}>{task.title}</div>
+                      <div className="text-[0.55rem] text-gray-400">
+                        {task.start} - {task.end} (
+                        {Math.floor(duration / 60) > 0 
+                          ? `${Math.floor(duration / 60)}h ${duration % 60 > 0 ? `${duration % 60}m` : ''}` 
+                          : `${duration}m`})
+                      </div>
+                    </>
+                  )}
+                  {/* Edit button */}
+                  <button 
+                    onClick={() => startEditTask(task)}
+                    className="absolute right-1 top-1 opacity-0 group-hover:opacity-100 transition text-[0.6rem] text-gray-400 hover:text-gray-600"
+                  >
+                    Edit
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
       
       {/* Time grid lines - skip first and last hour */}
       <div className="absolute left-0 top-[30px] bottom-0 w-12 border-r border-gray-200 pr-1 z-20">
@@ -502,77 +573,6 @@ function Calendar() {
             }}
           />
         ))}
-      </div>
-      
-      <div style={{ 
-        height: `${visibleHours * 60 * SCALE_FACTOR + TOP_PADDING}px`, 
-        position: 'relative', 
-        marginLeft: `${TIME_COLUMN_WIDTH}px`,
-        paddingTop: `${TOP_PADDING}px`
-      }}>
-        {isLoading ? (
-          <div className="text-center py-2">Loading tasks...</div>
-        ) : tasks.length === 0 ? (
-          <div className="text-center py-2 text-gray-500">No tasks for this date</div>
-        ) : (
-          tasks.map((task) => {
-          const duration = calculateDuration(task.start, task.end);
-          const height = calculateHeight(duration);
-          const position = calculateTaskPosition(task.start);
-          
-          return (
-            <div
-              key={task.id}
-              className={`flex items-start py-0.5 px-1 rounded-lg shadow-sm bg-white transition border-l-4 overflow-hidden ${
-                task.checked ? "border-green-400 opacity-60" : "border-blue-400"
-              } relative`}
-              style={{ 
-                height: `${height - (TASK_BUFFER * 2)}px`, // Fixed height instead of minHeight
-                position: 'absolute',
-                top: `${position}px`,
-                left: 0,
-                right: 0,
-                zIndex: task.id, // Use task ID for z-index to maintain consistent stacking
-                boxShadow: '0 1px 3px rgba(0,0,0,0.1)' // Add subtle shadow for depth
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={task.checked}
-                onChange={() => toggleCheck(task.id)}
-                className="w-3 h-3 accent-blue-500 mr-2 mt-1"
-              />
-              <div className="flex-1 group">
-                {duration < 30 ? (
-                  // For tasks under 30 minutes, hide timing text
-                  <div className="flex items-center">
-                    <div className={`font-medium text-[0.625rem] ${task.checked ? "line-through text-gray-400" : "text-gray-800"}`}>{task.title}</div>
-                  </div>
-                ) : (
-                  // For longer tasks, keep the original stacked layout
-                  <>
-                    <div className={`font-medium text-[0.625rem] ${task.checked ? "line-through text-gray-400" : "text-gray-800"}`}>{task.title}</div>
-                    <div className="text-[0.55rem] text-gray-400">
-                      {task.start} - {task.end} (
-                      {Math.floor(duration / 60) > 0 
-                        ? `${Math.floor(duration / 60)}h ${duration % 60 > 0 ? `${duration % 60}m` : ''}` 
-                        : `${duration}m`})
-                    </div>
-                  </>
-                )}
-                
-                {/* Edit button */}
-                <button 
-                  onClick={() => startEditTask(task)}
-                  className="absolute right-1 top-1 opacity-0 group-hover:opacity-100 transition text-[0.6rem] text-gray-400 hover:text-gray-600"
-                >
-                  Edit
-                </button>
-              </div>
-            </div>
-          );
-        })
-        )}
       </div>
     </div>
   );
