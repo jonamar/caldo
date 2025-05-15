@@ -11,7 +11,7 @@ import {
 function Calendar() {
   const [tasks, setTasks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  // Always use today's date instead of a selectable date
   const [dateString, setDateString] = useState(formatDateForFile());
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -37,13 +37,13 @@ function Calendar() {
     end: '10:00'
   });
 
-  // Load tasks when the selected date changes
+  // Load tasks for today's date
   useEffect(() => {
     const fetchTasks = async () => {
       setIsLoading(true);
       try {
-        // Format the date for storage
-        const formattedDate = formatDateForFile(selectedDate);
+        // Format today's date for storage
+        const formattedDate = formatDateForFile();
         setDateString(formattedDate);
         
         // Load tasks from localStorage
@@ -58,12 +58,29 @@ function Calendar() {
     };
 
     fetchTasks();
-  }, [selectedDate]);
+  }, []);
 
-  // Handle date change
-  const handleDateChange = (e) => {
-    const newDate = new Date(e.target.value);
-    setSelectedDate(newDate);
+  // Refresh tasks (replaces date change functionality)
+  const refreshTasks = async () => {
+    const fetchTasks = async () => {
+      setIsLoading(true);
+      try {
+        // Format today's date for storage
+        const formattedDate = formatDateForFile();
+        setDateString(formattedDate);
+        
+        // Load tasks from localStorage
+        const loadedTasks = await loadTasksForDate(formattedDate);
+        setTasks(loadedTasks);
+      } catch (error) {
+        console.error('Error loading tasks:', error);
+        setTasks([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    await fetchTasks();
   };
 
   // Toggle task completion status
@@ -177,11 +194,6 @@ function Calendar() {
     setShowTaskForm(false);
   };
 
-  // Format date for the date input
-  const formatDateForInput = (date) => {
-    return date.toISOString().split('T')[0];
-  };
-
   // Calculate task duration in minutes
   const calculateDuration = (start, end) => {
     const [startHour, startMin] = start.split(':').map(Number);
@@ -191,66 +203,6 @@ function Calendar() {
     const endMinutes = endHour * 60 + endMin;
     
     return endMinutes - startMinutes;
-  };
-  
-  // Calendar constants and configuration
-  const SCALE_FACTOR = 2; // 2px per minute = 120px per hour
-  const HEADER_HEIGHT = 30; // Minimal height of the date selector area
-  const TIME_COLUMN_WIDTH = 48; // Width of the time markers column
-  const TASK_BUFFER = 4; // Reduced buffer space for tasks
-  const TOP_PADDING = 5; // Extremely minimal padding at the top of the calendar
-  
-  // Single source of truth for all time-to-position calculations
-  const timeToPosition = (hours, minutes, options = {}) => {
-    const { includeHeaderOffset = true, applyTaskOffset = false } = options;
-    const timeRange = calculateTimeRange(tasks);
-    
-    // Calculate minutes from the start of the visible range, accounting for partial hour start
-    const minutesFromStart = (hours - timeRange.startHour) * 60 + minutes - (timeRange.startMinuteRemainder || 0);
-    
-    // Convert to pixels
-    let position = minutesFromStart * SCALE_FACTOR;
-    
-    // Add header offset if needed
-    if (includeHeaderOffset) {
-      position += HEADER_HEIGHT;
-    }
-    
-    return position;
-  };
-  
-  // Calculate position for a task based on its start time
-  const calculateTaskPosition = (start) => {
-    const [hour, min] = start.split(':').map(Number);
-    return timeToPosition(hour, min);
-  };
-
-  // Calculate height based on duration
-  const calculateHeight = (duration) => {
-    // For absolute positioning, height should be proportional to duration
-    // Minimum height ensures very short tasks are still visible
-    const minHeight = 32;
-    const durationHeight = duration * SCALE_FACTOR;
-    
-    // We'll use the exact duration height to maintain grid alignment
-    return Math.max(minHeight, durationHeight);
-  };
-
-  // Calculate the earliest and latest times for the day's tasks
-  // Check if current time is within the visible range
-  const isCurrentTimeVisible = () => {
-    // Only show if we're viewing today's date
-    if (!isSameDay(selectedDate, new Date())) return false;
-    
-    const now = currentTime;
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-    
-    // Convert current time to minutes
-    const currentTimeInMinutes = currentHour * 60 + currentMinute;
-    
-    // Check if current time falls within the visible range
-    return currentHour >= timeRange.startHour && currentHour < timeRange.endHour;
   };
   
   // Calculate the position for the current time indicator
@@ -311,39 +263,97 @@ function Calendar() {
     };
   };
   
+  const timeToPosition = (hours, minutes, options = {}) => {
+    const { includeHeaderOffset = true, applyTaskOffset = false } = options;
+    const timeRange = calculateTimeRange(tasks);
+    
+    // Calculate minutes from the start of the visible range, accounting for partial hour start
+    const minutesFromStart = (hours - timeRange.startHour) * 60 + minutes - (timeRange.startMinuteRemainder || 0);
+    
+    // Convert to pixels
+    let position = minutesFromStart * 2;
+    
+    // Add header offset if needed
+    if (includeHeaderOffset) {
+      position += 30;
+    }
+    
+    return position;
+  };
+  
+  // Calculate position for a task based on its start time
+  const calculateTaskPosition = (start) => {
+    const [hour, min] = start.split(':').map(Number);
+    return timeToPosition(hour, min);
+  };
+
+  // Calculate height based on duration
+  const calculateHeight = (duration) => {
+    // For absolute positioning, height should be proportional to duration
+    // Minimum height ensures very short tasks are still visible
+    const minHeight = 32;
+    const durationHeight = duration * 2;
+    
+    // We'll use the exact duration height to maintain grid alignment
+    return Math.max(minHeight, durationHeight);
+  };
+
+  // Calculate the earliest and latest times for the day's tasks
+  // Check if current time is within the visible range
+  const isCurrentTimeVisible = () => {
+    // Always show the current time indicator since we're always viewing today
+    const now = currentTime;
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    
+    // Convert current time to minutes
+    const currentTimeInMinutes = currentHour * 60 + currentMinute;
+    
+    // Check if current time falls within the visible range
+    return currentHour >= timeRange.startHour && currentHour < timeRange.endHour;
+  };
+  
   const timeRange = calculateTimeRange(tasks);
   const visibleHours = timeRange.endHour - timeRange.startHour;
-  
+
   return (
     <div className="w-full max-w-md space-y-0 relative">
       <div className="mb-1 relative z-30">
         <div className="flex justify-between items-center">
-          <label htmlFor="date-select" className="block text-sm font-medium text-gray-700 mb-1">
-            Select Date:
-          </label>
-          <button 
-            onClick={() => {
-              setShowTaskForm(!showTaskForm);
-              setEditingTask(null);
-            }}
-            className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 transition"
-          >
-            {showTaskForm ? 'Cancel' : '+ Add Task'}
-          </button>
+          <h2 className="text-sm font-medium text-gray-700">
+            Today's Tasks
+          </h2>
+          <div className="flex space-x-2">
+            <button 
+              onClick={refreshTasks}
+              className="text-xs bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600 transition"
+              title="Refresh tasks"
+            >
+              Refresh
+            </button>
+            <button 
+              onClick={() => {
+                setShowTaskForm(!showTaskForm);
+                setEditingTask(null);
+              }}
+              className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 transition"
+            >
+              {showTaskForm ? 'Cancel' : '+ Add Task'}
+            </button>
+            <button
+              onClick={handleClearTasks}
+              className="text-xs bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 transition"
+              title="Clear all tasks for today (local & server)"
+            >
+              Clear All
+            </button>
+          </div>
         </div>
-        <input
-          type="date"
-          id="date-select"
-          value={formatDateForInput(selectedDate)}
-          onChange={handleDateChange}
-          className="w-full p-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 relative z-30"
-        />
       </div>
       
       {/* New Task Form */}
       {showTaskForm && (
         <div className="bg-white p-3 rounded-lg shadow-md mb-3 z-40 relative">
-          <h3 className="text-sm font-medium mb-2">Add New Task</h3>
           <form onSubmit={handleCreateTask}>
             <div className="mb-2">
               <label className="block text-xs text-gray-700">Title</label>
