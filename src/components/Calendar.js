@@ -62,25 +62,41 @@ function Calendar() {
 
   // Refresh tasks (replaces date change functionality)
   const refreshTasks = async () => {
-    const fetchTasks = async () => {
-      setIsLoading(true);
-      try {
-        // Format today's date for storage
-        const formattedDate = formatDateForFile();
-        setDateString(formattedDate);
-        
-        // Load tasks from localStorage
-        const loadedTasks = await loadTasksForDate(formattedDate);
-        setTasks(loadedTasks);
-      } catch (error) {
-        console.error('Error loading tasks:', error);
-        setTasks([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    await fetchTasks();
+    setIsLoading(true);
+    try {
+      // Format today's date for storage
+      const formattedDate = formatDateForFile();
+      setDateString(formattedDate);
+      
+      // Load tasks from localStorage
+      const loadedTasks = await loadTasksForDate(formattedDate);
+      setTasks(loadedTasks);
+    } catch (error) {
+      console.error('Error loading tasks:', error);
+      setTasks([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Clear all Caldo-related localStorage and server data for the current date
+  const handleClearTasks = async () => {
+    // Remove from localStorage
+    window.localStorage.removeItem(`tasks_${dateString}`);
+    // Remove 'caldo_initialized' flag to allow re-initialization if needed
+    window.localStorage.removeItem('caldo_initialized');
+    // Remove from server (if online)
+    try {
+      await deleteTask(dateString, '*'); // '*' as a convention to delete all tasks
+    } catch (err) {
+      // ignore errors if offline
+      console.log('Error clearing tasks from server:', err);
+    }
+    // Reload tasks (show empty list)
+    setTasks([]);
+    
+    // Show confirmation
+    alert('All tasks cleared successfully!');
   };
 
   // Toggle task completion status
@@ -205,6 +221,13 @@ function Calendar() {
     return endMinutes - startMinutes;
   };
   
+  // Calendar constants and configuration
+  const SCALE_FACTOR = 2; // 2px per minute = 120px per hour
+  const HEADER_HEIGHT = 30; // Minimal height of the date selector area
+  const TIME_COLUMN_WIDTH = 48; // Width of the time markers column
+  const TASK_BUFFER = 4; // Reduced buffer space for tasks
+  const TOP_PADDING = 5; // Extremely minimal padding at the top of the calendar
+  
   // Calculate the position for the current time indicator
   const calculateCurrentTimePosition = () => {
     const now = currentTime;
@@ -271,11 +294,11 @@ function Calendar() {
     const minutesFromStart = (hours - timeRange.startHour) * 60 + minutes - (timeRange.startMinuteRemainder || 0);
     
     // Convert to pixels
-    let position = minutesFromStart * 2;
+    let position = minutesFromStart * SCALE_FACTOR;
     
     // Add header offset if needed
     if (includeHeaderOffset) {
-      position += 30;
+      position += HEADER_HEIGHT;
     }
     
     return position;
@@ -292,7 +315,7 @@ function Calendar() {
     // For absolute positioning, height should be proportional to duration
     // Minimum height ensures very short tasks are still visible
     const minHeight = 32;
-    const durationHeight = duration * 2;
+    const durationHeight = duration * SCALE_FACTOR;
     
     // We'll use the exact duration height to maintain grid alignment
     return Math.max(minHeight, durationHeight);
