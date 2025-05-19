@@ -201,7 +201,8 @@ function Calendar() {
   // Calculate position for a task based on its start time
   const calculateTaskPosition = (start) => {
     const [hour, min] = start.split(':').map(Number);
-    return timeToPosition(hour, min);
+    // Match the time markers by using includeHeaderOffset: false
+    return timeToPosition(hour, min, { includeHeaderOffset: false });
   };
 
   // Calculate height based on duration
