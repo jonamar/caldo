@@ -304,25 +304,16 @@ function Calendar() {
                   onChange={() => toggleCheck(task.id)}
                   className="w-3 h-3 accent-blue-500 mr-2 mt-1"
                 />
-                <div className="flex-1 group">
-                  {duration < 30 ? (
-                    // For tasks under 30 minutes, hide timing text
-                    <div className="flex items-center">
-                      <div className={`font-medium text-[0.625rem] ${task.checked ? "line-through text-gray-400" : "text-gray-800"}`}>{task.title}</div>
-                    </div>
-                  ) : (
-                    // For longer tasks, keep the original stacked layout
-                    <>
-                      <div className={`font-medium text-[0.625rem] ${task.checked ? "line-through text-gray-400" : "text-gray-800"}`}>{task.title}</div>
-                      <div className="text-[0.55rem] text-gray-400">
-                        {task.start} - {task.end} (
-                        {Math.floor(duration / 60) > 0 
-                          ? `${Math.floor(duration / 60)}h ${duration % 60 > 0 ? `${duration % 60}m` : ''}` 
-                          : `${duration}m`})
-                      </div>
-                    </>
-                  )}
-
+                <div className="flex-1 group flex justify-between items-start">
+                  <div className={`font-medium text-[0.625rem] ${task.checked ? "line-through text-gray-400" : "text-gray-800"}`}>
+                    {task.title}
+                  </div>
+                  <div className="text-[0.55rem] text-gray-400 whitespace-nowrap ml-2">
+                    {task.start} - {task.end} (
+                    {Math.floor(duration / 60) > 0 
+                      ? `${Math.floor(duration / 60)}h${duration % 60 > 0 ? `${duration % 60}m` : ''}` 
+                      : `${duration}m`})
+                  </div>
                 </div>
               </div>
             );
