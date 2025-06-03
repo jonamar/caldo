@@ -210,18 +210,28 @@ const minutesToTime = (totalMinutes) => {
   };
   
   const calculateTimeRange = (taskList) => {
-    if (!taskList || taskList.length === 0) return { startHour: 8, endHour: 18 }; // Default 8am-6pm if no tasks
+    if (window.debugCaldo) console.log("calculateTimeRange called with tasks:", JSON.parse(JSON.stringify(taskList || [])));
+    if (!taskList || taskList.length === 0) {
+      const defaultRange = { startHour: 8, endHour: 18, startMinuteRemainder: 0 };
+      if (window.debugCaldo) console.log("calculateTimeRange returning default (no tasks):", defaultRange);
+      return defaultRange;
+    }
     
     let earliestMinutes = 24 * 60;
     let latestMinutes = 0;
+    let validTasksFound = false;
     
     taskList.forEach(task => {
+      if (!task || !task.start || !task.end || !task.start.includes(':') || !task.end.includes(':')) {
+        if (window.debugCaldo) console.warn("calculateTimeRange: Skipping task with invalid start/end times", task);
+        return; // Skip malformed tasks
+      }
+      validTasksFound = true;
       const startHour = parseInt(task.start.split(':')[0]);
       const startMin = parseInt(task.start.split(':')[1]);
       const endHour = parseInt(task.end.split(':')[0]);
       const endMin = parseInt(task.end.split(':')[1]);
       
-      // Convert to total minutes for more precise calculation
       const startTotalMins = startHour * 60 + startMin;
       const endTotalMins = endHour * 60 + endMin;
       
@@ -229,41 +239,47 @@ const minutesToTime = (totalMinutes) => {
       latestMinutes = Math.max(latestMinutes, endTotalMins);
     });
     
-    // Absolute minimal buffer: 2 minutes above, 10 minutes below
+    if (!validTasksFound) { // All tasks were skipped or list was effectively empty of valid tasks
+      const defaultRange = { startHour: 8, endHour: 18, startMinuteRemainder: 0 };
+      if (window.debugCaldo) console.log("calculateTimeRange returning default (no valid tasks found):", defaultRange);
+      return defaultRange;
+    }
+
     const topBufferMinutes = 2;
     const bottomBufferMinutes = 10;
     
-    // Calculate start and end times with buffer
     const startMinutes = Math.max(0, earliestMinutes - topBufferMinutes);
     const endMinutes = Math.min(24 * 60, latestMinutes + bottomBufferMinutes);
     
-    // Convert back to hours
     const startHour = Math.floor(startMinutes / 60);
     const startMinuteRemainder = startMinutes % 60;
     const endHour = Math.ceil(endMinutes / 60);
     
-    return { 
+    const resultRange = { 
       startHour, 
       startMinuteRemainder,
       endHour 
     };
+    if (window.debugCaldo) console.log("calculateTimeRange returning:", resultRange);
+    return resultRange;
   };
   
-  const timeToPosition = (hours, minutes, options = {}) => {
-    const { includeHeaderOffset = true, applyTaskOffset = false } = options;
-    const timeRange = calculateTimeRange(tasks);
+  const timeToPosition = (hours, minutes, options = {}, rangeOverride = null) => {
+    const { includeHeaderOffset = true } = options; 
     
-    // Calculate minutes from the start of the visible range, accounting for partial hour start
-    const minutesFromStart = (hours - timeRange.startHour) * 60 + minutes - (timeRange.startMinuteRemainder || 0);
+    const effectiveTimeRange = rangeOverride || timeRange; 
+
+    if (!effectiveTimeRange || typeof effectiveTimeRange.startHour === 'undefined' || typeof effectiveTimeRange.endHour === 'undefined') {
+      if (window.debugCaldo) console.error("timeToPosition: effectiveTimeRange is invalid or not yet defined.", JSON.parse(JSON.stringify(effectiveTimeRange)), "Current tasks:", JSON.parse(JSON.stringify(tasks)));
+      return includeHeaderOffset ? HEADER_HEIGHT : 0; 
+    }
     
-    // Convert to pixels
+    const minutesFromStart = (hours - effectiveTimeRange.startHour) * 60 + minutes - (effectiveTimeRange.startMinuteRemainder || 0);
     let position = minutesFromStart * SCALE_FACTOR;
     
-    // Add header offset if needed
     if (includeHeaderOffset) {
       position += HEADER_HEIGHT;
     }
-    
     return position;
   };
   
@@ -287,23 +303,64 @@ const minutesToTime = (totalMinutes) => {
 
   // Calculate the earliest and latest times for the day's tasks
   // Check if current time is within the visible range
-  const isCurrentTimeVisible = () => {
-    // Always show the current time indicator since we're always viewing today
-    const now = currentTime;
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-    
-    // Convert current time to minutes
-    const currentTimeInMinutes = currentHour * 60 + currentMinute;
-    
-    // Check if current time falls within the visible range
-    return currentHour >= timeRange.startHour && currentHour < timeRange.endHour;
-  };
+
+
+// Calculate the earliest and latest times for the day's tasks
+// Check if current time is within the visible range
+const isCurrentTimeVisible = () => {
+  // Always show the current time indicator since we're always viewing today
+  const now = currentTime;
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
   
+  // Convert current time to minutes
+  const currentTimeInMinutes = currentHour * 60 + currentMinute;
+  
+  // Check if current time falls within the visible range
+  return currentHour >= timeRange.startHour && currentHour < timeRange.endHour;
+};
 
+// --- Start of Time Indicator Debug Logic ---
+console.log("Time Indicator Debug Logic block entered - v3");
+const timeRange = calculateTimeRange(tasks); // This is for the grid lines and general UI
+const visibleHours = (timeRange && typeof timeRange.endHour !== 'undefined' && typeof timeRange.startHour !== 'undefined') 
+                     ? timeRange.endHour - timeRange.startHour 
+                     : 10; 
 
-const timeRange = calculateTimeRange(tasks);
-const visibleHours = timeRange.endHour - timeRange.startHour;
+let localIndicatorTimeRange = null;
+let localIndicatorVisible = false;
+let localIndicatorTopPosition = 0;
+
+if (currentTime && typeof currentTime.getHours === 'function') {
+  localIndicatorTimeRange = calculateTimeRange(tasks); 
+
+  localIndicatorVisible = currentTime.getHours() >= localIndicatorTimeRange.startHour && 
+                          currentTime.getHours() < localIndicatorTimeRange.endHour;
+  
+  localIndicatorTopPosition = timeToPosition(
+    currentTime.getHours(), 
+    currentTime.getMinutes(), 
+    { includeHeaderOffset: false }, 
+    localIndicatorTimeRange 
+  );
+
+  console.log("window.debugCaldo value check before group:", window.debugCaldo);
+  if (window.debugCaldo) {
+    console.groupCollapsed(
+      `%cTime Indicator Debug @ ${currentTime.toLocaleTimeString()}`,
+      'color: dodgerblue; font-weight: bold;'
+    );
+    console.log("Current Time (state):", currentTime.toLocaleTimeString(), currentTime);
+    console.log("Tasks (state):", JSON.parse(JSON.stringify(tasks)));
+    console.log("Calculated TimeRange (for indicator):", localIndicatorTimeRange);
+    console.log("Is Current Time Visible (for indicator):", localIndicatorVisible);
+    console.log("Calculated Top Position (for indicator):", localIndicatorTopPosition);
+    console.groupEnd();
+  }
+} else {
+  if (window.debugCaldo) console.warn("Time Indicator Debug: currentTime state is not yet valid.", currentTime);
+}
+// --- End of Time Indicator Debug Logic ---
 
 return (
   <div className="w-full max-w-md space-y-0 relative">
@@ -389,14 +446,14 @@ return (
               }}
             >
               {/* Current Time Indicator */}
-              {isCurrentTimeVisible() && (
+              {localIndicatorVisible && (
                 <div 
                   className="absolute border-t-2 border-red-500 pointer-events-none"
                   style={{ 
-                    top: `${timeToPosition(currentTime.getHours(), currentTime.getMinutes(), { includeHeaderOffset: false })}px`,
+                    top: `${localIndicatorTopPosition}px`,
                     left: 0,
                     right: 0,
-                    zIndex: 100 // Above tasks but below dragged item
+                    zIndex: 150 // Above static tasks, below dragged item
                   }}
                 />
               )}
@@ -429,7 +486,7 @@ return (
                             top: `${position}px`, // Position relative to the Droppable container
                             left: 0,
                             right: 0,
-                            zIndex: snapshotDraggable.isDragging ? 200 : (task.id || index) + 10, // Ensure dragged item is on top
+                            zIndex: snapshotDraggable.isDragging ? 200 : index + 10, // Cascade: Use index for more predictable static z-index // Ensure dragged item is on top
                             boxShadow: snapshotDraggable.isDragging ? '0 4px 8px rgba(0,0,0,0.2)' : '0 1px 3px rgba(0,0,0,0.1)',
                           }}
                         >
