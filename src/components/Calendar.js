@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { 
   loadTasksForDate, 
   formatDateForFile, 
@@ -92,6 +93,57 @@ function Calendar() {
     alert('All tasks cleared successfully!');
   };
 
+  const onDragEnd = async (result) => {
+    const { source, destination } = result;
+
+    // Dropped outside the list or in the same spot
+    if (!destination || (destination.droppableId === source.droppableId && destination.index === source.index)) {
+      return;
+    }
+
+    const reorderedTasksArray = Array.from(tasks);
+    const [draggedItem] = reorderedTasksArray.splice(source.index, 1);
+    reorderedTasksArray.splice(destination.index, 0, draggedItem);
+
+    // Determine the anchor start time
+    let anchorStartTimeMinutes = timeToMinutes(tasks[0]?.start || '08:00');
+    // If the first item was dragged, its original start time becomes the anchor for the new sequence starting with it.
+    // Or, if the list was initially empty, the dragged item's start time is the anchor.
+    if ((source.index === 0 && reorderedTasksArray.length > 0 && reorderedTasksArray[0].id === draggedItem.id) || 
+        (tasks.length === 0 && reorderedTasksArray.length > 0)) {
+        anchorStartTimeMinutes = timeToMinutes(draggedItem.start || '08:00');
+    }
+
+    const finalUpdatedTasks = [];
+    for (let i = 0; i < reorderedTasksArray.length; i++) {
+      const task = reorderedTasksArray[i];
+      // Calculate duration based on its original start/end before any modifications in this drag operation
+      // This requires finding the original task object if start/end were already modified in a previous iteration by mistake.
+      // However, reorderedTasksArray contains tasks with their original start/end prior to this loop.
+      const originalDurationMinutes = calculateDuration(task.start, task.end);
+      let newStartTimeMinutes;
+
+      if (i === 0) {
+        newStartTimeMinutes = anchorStartTimeMinutes;
+      } else {
+        // Use the .end time of the *previously processed task in this loop*
+        const previousTaskEndTimeMinutes = timeToMinutes(finalUpdatedTasks[i - 1].end);
+        newStartTimeMinutes = previousTaskEndTimeMinutes;
+      }
+
+      const newEndTimeMinutes = newStartTimeMinutes + originalDurationMinutes;
+
+      finalUpdatedTasks.push({
+        ...task,
+        start: minutesToTime(newStartTimeMinutes),
+        end: minutesToTime(newEndTimeMinutes),
+      });
+    }
+
+    setTasks(finalUpdatedTasks);
+    await saveTasksForDate(dateString, finalUpdatedTasks);
+  };
+
   // Toggle task completion status
   const toggleCheck = async (id) => {
     const updatedTasks = tasks.map((task) =>
@@ -104,7 +156,24 @@ function Calendar() {
     await saveTasksForDate(dateString, updatedTasks);
   };
 
-  // Calculate task duration in minutes
+  // Helper function to convert "HH:MM" string to total minutes from midnight
+const timeToMinutes = (timeStr) => {
+  if (!timeStr || !timeStr.includes(':')) return 0; // Or handle error appropriately
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  return hours * 60 + minutes;
+};
+
+// Helper function to convert total minutes from midnight to "HH:MM" string
+const minutesToTime = (totalMinutes) => {
+  if (isNaN(totalMinutes) || totalMinutes < 0) totalMinutes = 0; // Handle invalid input
+  // Ensure totalMinutes does not exceed minutes in a day for formatting
+  totalMinutes = totalMinutes % (24 * 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+};
+
+// Calculate task duration in minutes
   const calculateDuration = (start, end) => {
     const [startHour, startMin] = start.split(':').map(Number);
     const [endHour, endMin] = end.split(':').map(Number);
@@ -231,146 +300,171 @@ function Calendar() {
     return currentHour >= timeRange.startHour && currentHour < timeRange.endHour;
   };
   
-  const timeRange = calculateTimeRange(tasks);
-  const visibleHours = timeRange.endHour - timeRange.startHour;
 
-  return (
-    <div className="w-full max-w-md space-y-0 relative">
-      <div className="mb-1 relative z-30">
-        <div className="flex justify-between items-center">
-          <h2 className="text-sm font-medium text-gray-700">
-            Today's Tasks
-          </h2>
-          <button 
-            onClick={refreshTasks}
-            className="w-6 h-6 flex items-center justify-center bg-gray-500 hover:bg-gray-600 rounded-full transition-colors"
-            title="Refresh tasks"
-          >
-            <svg 
-              xmlns="http://www.w3.org/2000/svg" 
-              width="14" 
-              height="14" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
-              className="text-white"
-            >
-              <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-              <path d="M3 3v5h5" />
-              <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
-              <path d="M16 16h5v5" />
-            </svg>
-          </button>
-        </div>
+
+const timeRange = calculateTimeRange(tasks);
+const visibleHours = timeRange.endHour - timeRange.startHour;
+
+return (
+  <div className="w-full max-w-md space-y-0 relative">
+    {/* Header Section for Date and Refresh Button */}
+    <div className="mb-1 relative z-30">
+      <div className="flex justify-between items-center">
+        <h2 className="text-sm font-medium text-gray-700">
+          Today's Tasks
+        </h2>
+        <button 
+          onClick={refreshTasks}
+          className="w-6 h-6 flex items-center justify-center bg-gray-500 hover:bg-gray-600 rounded-full transition-colors"
+          title="Refresh tasks"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
+            <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+            <path d="M3 3v5h5" />
+            <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+            <path d="M16 16h5v5" />
+          </svg>
+        </button>
       </div>
-      
-      {/* Time range is automatically calculated with 20min buffer above and 40min below */}
-      
-      {/* Task card container, now also holds the current time indicator */}
-      <div style={{ 
-        height: `${visibleHours * 60 * SCALE_FACTOR + TOP_PADDING}px`, 
-        position: 'relative', 
-        marginLeft: `${TIME_COLUMN_WIDTH}px`,
-        paddingTop: `${TOP_PADDING}px`
-      }}>
-        {/* Current time indicator (red line) - must be inside this container */}
-        {isCurrentTimeVisible() && (
-          <div 
-            className="absolute border-t-2 border-red-500 pointer-events-none"
-            style={{ 
-              top: `${timeToPosition(currentTime.getHours(), currentTime.getMinutes(), { includeHeaderOffset: false })}px`,
-              left: 0,
-              right: 0,
-              zIndex: 1000
-            }}
-          />
-        )}
+    </div>
 
-        {isLoading ? (
-          <div className="text-center py-2">Loading tasks...</div>
-        ) : tasks.length === 0 ? (
-          <div className="text-center py-2 text-gray-500">No tasks for this date</div>
-        ) : (
-          tasks.map((task) => {
-            const duration = calculateDuration(task.start, task.end);
-            const height = calculateHeight(duration);
-            const position = calculateTaskPosition(task.start);
-            
+    {/* Main Calendar Area with Drag and Drop Context */}
+    <DragDropContext onDragEnd={onDragEnd}>
+      <div style={{ position: 'relative' }}> {/* This div will contain both time grid and droppable task area */}
+        
+        {/* Time Grid Lines (Vertical - Time Markers) */}
+        <div className="absolute left-0 top-0 bottom-0 w-12 border-r border-gray-200 pr-1 z-0" style={{ paddingTop: `${HEADER_HEIGHT + TOP_PADDING}px` }}>
+          {Array.from({ length: Math.max(0, visibleHours) }, (_, i) => {
+            // Display every hour, adjust if timeRange.startMinuteRemainder is present for first hour
+            const hourToDisplay = timeRange.startHour + i;
+            if (hourToDisplay > timeRange.endHour) return null; // Don't draw past endHour
+            // Calculate position carefully, relative to the start of the droppable area
+            const position = timeToPosition(hourToDisplay, 0, { includeHeaderOffset: false });
+            if (position < 0 && i > 0) return null; // Skip if before visible start due to startMinuteRemainder
+
             return (
-              <div
-                key={task.id}
-                className={`flex items-start py-0.5 px-1 rounded-lg shadow-sm bg-white transition border-l-4 overflow-hidden ${
-                  task.checked ? "border-green-400 opacity-60" : "border-blue-400"
-                } relative`}
-                style={{ 
-                  height: `${height - (TASK_BUFFER * 2)}px`, // Fixed height instead of minHeight
-                  position: 'absolute',
-                  top: `${position}px`,
-                  left: 0,
-                  right: 0,
-                  zIndex: task.id, // Use task ID for z-index to maintain consistent stacking
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)' // Add subtle shadow for depth
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={task.checked}
-                  onChange={() => toggleCheck(task.id)}
-                  className="w-3 h-3 accent-blue-500 mr-2 mt-1"
-                />
-                <div className="flex-1 group flex justify-between items-start">
-                  <div className={`font-medium text-[0.625rem] ${task.checked ? "line-through text-gray-400" : "text-gray-800"}`}>
-                    {task.title}
-                  </div>
-                  <div className="text-[0.55rem] text-gray-400 whitespace-nowrap ml-2">
-                    {task.start} - {task.end} (
-                    {Math.floor(duration / 60) > 0 
-                      ? `${Math.floor(duration / 60)}h${duration % 60 > 0 ? `${duration % 60}m` : ''}` 
-                      : `${duration}m`})
-                  </div>
+              <div key={`time-marker-${hourToDisplay}`} className="relative">
+                <div 
+                  className="absolute text-[0.6rem] text-gray-400 right-1"
+                  style={{ top: `${position}px` }}
+                >
+                  {hourToDisplay}:00
                 </div>
               </div>
             );
-          })
-        )}
-      </div>
-      
-      {/* Time grid lines - skip first and last hour */}
-      <div className="absolute left-0 top-[30px] bottom-0 w-12 border-r border-gray-200 pr-1 z-20">
-        {Array.from({ length: Math.max(0, visibleHours - 2) }, (_, i) => (
-          <div key={`time-${i}`} className="relative">
-            <div 
-              className="absolute text-[0.6rem] text-gray-400 right-1" 
-              style={{ 
-                top: `${timeToPosition(timeRange.startHour + i + 1, 0, { includeHeaderOffset: false })}px` 
+          })}
+        </div>
+
+        {/* Horizontal Grid Lines */}
+        <div className="absolute left-[48px] right-0 top-0 bottom-0 pointer-events-none z-0" style={{ paddingTop: `${HEADER_HEIGHT + TOP_PADDING}px` }}>
+          {Array.from({ length: Math.max(0, visibleHours) }, (_, i) => {
+            const hourToDisplay = timeRange.startHour + i;
+            if (hourToDisplay > timeRange.endHour) return null;
+            const position = timeToPosition(hourToDisplay, 0, { includeHeaderOffset: false });
+            if (position < 0 && i > 0) return null;
+
+            return (
+              <div 
+                key={`grid-line-${hourToDisplay}`} 
+                className="border-t border-gray-100"
+                style={{ position: 'absolute', left: 0, right: 0, top: `${position}px` }}
+              />
+            );
+          })}
+        </div>
+
+        {/* Droppable Area for Tasks */}
+        <Droppable droppableId="calendar-tasks">
+          {(provided, snapshot) => (
+            <div
+              {...provided.droppableProps}
+              ref={provided.innerRef}
+              style={{
+                minHeight: `${visibleHours * 60 * SCALE_FACTOR + TOP_PADDING}px`,
+                position: 'relative', // Crucial for absolute positioning of tasks
+                marginLeft: `${TIME_COLUMN_WIDTH}px`, // Offset for time column
+                paddingTop: `${HEADER_HEIGHT + TOP_PADDING}px`, // Offset for header
+                // backgroundColor: snapshot.isDraggingOver ? 'rgba(0,0,255,0.1)' : 'transparent', // Visual cue
+                zIndex: 1 // Ensure tasks are above grid lines
               }}
             >
-              {timeRange.startHour + i + 1}:00
+              {/* Current Time Indicator */}
+              {isCurrentTimeVisible() && (
+                <div 
+                  className="absolute border-t-2 border-red-500 pointer-events-none"
+                  style={{ 
+                    top: `${timeToPosition(currentTime.getHours(), currentTime.getMinutes(), { includeHeaderOffset: false })}px`,
+                    left: 0,
+                    right: 0,
+                    zIndex: 100 // Above tasks but below dragged item
+                  }}
+                />
+              )}
+
+              {/* Task Rendering Logic */}
+              {isLoading ? (
+                <div className="text-center py-2">Loading tasks...</div>
+              ) : tasks.length === 0 ? (
+                <div className="text-center py-2 text-gray-500">No tasks for this date</div>
+              ) : (
+                tasks.map((task, index) => {
+                  const duration = calculateDuration(task.start, task.end);
+                  const height = calculateHeight(duration);
+                  const position = calculateTaskPosition(task.start); // This is relative to the droppable area's top
+                  
+                  return (
+                    <Draggable key={task.id} draggableId={task.id.toString()} index={index}>
+                      {(providedDraggable, snapshotDraggable) => (
+                        <div
+                          ref={providedDraggable.innerRef}
+                          {...providedDraggable.draggableProps}
+                          {...providedDraggable.dragHandleProps}
+                          className={`flex items-start py-0.5 px-1 rounded-lg shadow-sm bg-white transition border-l-4 overflow-hidden ${
+                            task.checked ? "border-green-400 opacity-60" : "border-blue-400"
+                          } relative`}
+                          style={{
+                            ...providedDraggable.draggableProps.style,
+                            height: `${height - (TASK_BUFFER * 2)}px`,
+                            position: 'absolute',
+                            top: `${position}px`, // Position relative to the Droppable container
+                            left: 0,
+                            right: 0,
+                            zIndex: snapshotDraggable.isDragging ? 200 : (task.id || index) + 10, // Ensure dragged item is on top
+                            boxShadow: snapshotDraggable.isDragging ? '0 4px 8px rgba(0,0,0,0.2)' : '0 1px 3px rgba(0,0,0,0.1)',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={task.checked}
+                            onChange={() => toggleCheck(task.id)}
+                            className="w-3 h-3 accent-blue-500 mr-2 mt-1"
+                          />
+                          <div className="flex-1 group flex justify-between items-start">
+                            <div className={`font-medium text-[0.625rem] ${task.checked ? "line-through text-gray-400" : "text-gray-800"}`}>
+                              {task.title}
+                            </div>
+                            <div className="text-[0.55rem] text-gray-400 whitespace-nowrap ml-2">
+                              {task.start} - {task.end} (
+                              {Math.floor(duration / 60) > 0 
+                                ? `${Math.floor(duration / 60)}h${duration % 60 > 0 ? `${duration % 60}m` : ''}` 
+                                : `${duration}m`})
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </Draggable>
+                  );
+                })
+              )}
+              {provided.placeholder} {/* DND Placeholder */}
             </div>
-          </div>
-        ))}
+          )}
+        </Droppable>
       </div>
-      
-      {/* Horizontal grid lines - skip first and last hour */}
-      <div className="absolute left-[48px] right-0 top-[30px] bottom-0 pointer-events-none">
-        {Array.from({ length: Math.max(0, visibleHours - 2) }, (_, i) => (
-          <div 
-            key={`grid-${i}`} 
-            className="border-t border-gray-100" 
-            style={{ 
-              position: 'absolute', 
-              left: 0, 
-              right: 0, 
-              top: `${timeToPosition(timeRange.startHour + i + 1, 0, { includeHeaderOffset: false })}px` 
-            }}
-          />
-        ))}
-      </div>
-    </div>
-  );
+    </DragDropContext>
+  </div>
+);
+
 }
 
 export default Calendar;
