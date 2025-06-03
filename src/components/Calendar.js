@@ -396,7 +396,8 @@ return (
             const hourToDisplay = timeRange.startHour + i;
             if (hourToDisplay > timeRange.endHour) return null; // Don't draw past endHour
             // Calculate position carefully, relative to the start of the droppable area
-            const position = timeToPosition(hourToDisplay, 0, { includeHeaderOffset: false });
+            const minuteOffsetPx = (timeRange.startMinuteRemainder || 0) * SCALE_FACTOR;
+            const position = timeToPosition(hourToDisplay, 0, { includeHeaderOffset: false }) - minuteOffsetPx;
             if (position < 0 && i > 0) return null; // Skip if before visible start due to startMinuteRemainder
 
             return (
@@ -450,13 +451,14 @@ return (
                 <div 
                   className="absolute border-t-2 border-red-500 pointer-events-none"
                   style={{ 
-                    top: `${localIndicatorTopPosition}px`,
+                    top: `${localIndicatorTopPosition - 5}px`, // Fine-tune for pixel-perfect alignment
                     left: 0,
                     right: 0,
                     zIndex: 150 // Above static tasks, below dragged item
                   }}
                 />
               )}
+
 
               {/* Task Rendering Logic */}
               {isLoading ? (
