@@ -32,7 +32,8 @@ yarn-error.log*
 .eslintcache
 .cache/
 
-# data privacy
+# data privacy - only ignore task files, not all JSON
 *.yaml
 *.yml   
-*.json
+tasks_*.json
+src/data/tasks/*.json

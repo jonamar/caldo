@@ -366,13 +366,13 @@ return (
   <div className="w-full max-w-md space-y-0 relative">
     {/* Header Section for Date and Refresh Button */}
     <div className="mb-1 relative z-30">
-      <div className="flex justify-between items-center">
-        <h2 className="text-sm font-medium text-gray-700">
+      <div className="flex items-center relative">
+        <h2 className="text-sm font-medium text-gray-700 w-full text-center">
           Today's Tasks
         </h2>
         <button 
           onClick={refreshTasks}
-          className="w-6 h-6 flex items-center justify-center bg-gray-500 hover:bg-gray-600 rounded-full transition-colors"
+          className="w-6 h-6 flex items-center justify-center bg-gray-500 hover:bg-gray-600 rounded-full transition-colors absolute right-0"
           title="Refresh tasks"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
