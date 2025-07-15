@@ -90,6 +90,16 @@ node scripts/update-tasks.js schedule --start "14:45" --end "16:30" --tasks "App
 
 Format: `Task Title:DurationInMinutes,Task Title:DurationInMinutes,...`
 
+#### Append New Tasks to Existing Schedule
+
+Add new tasks to your day without replacing existing ones:
+
+```bash
+node scripts/update-tasks.js schedule --append --start "16:30" --end "18:00" --tasks "Follow up on applications:20,Evening planning:15"
+```
+
+Using the `--append` flag preserves all existing tasks for the day and adds the new tasks at the end.
+
 #### Directly Set Tasks
 
 Set specific tasks with exact start and end times:

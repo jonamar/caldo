@@ -9,6 +9,9 @@
  * Usage:
  * node update-tasks.js schedule --start "14:45" --end "16:30" --tasks "Apply to easy job application #1:15,Apply to easy job application #2:15,Apply to medium difficulty job application:30,Call the glasses store:15,Rest time:45"
  * 
+ * To append new tasks to existing ones (instead of replacing all tasks):
+ * node update-tasks.js schedule --append --start "15:30" --end "17:00" --tasks "Additional task:30,Another task:45"
+ * 
  * Or to directly set tasks:
  * node update-tasks.js set --tasks '[{"title":"Task 1","start":"09:00","end":"10:00"},{"title":"Task 2","start":"10:30","end":"11:30"}]'
  * 
@@ -104,14 +107,26 @@ const today = formatDateForFile();
       let startTime = '09:00';
       let endTime = '17:00';
       let tasksString = '';
+      let appendMode = false; // New flag to determine if we should append to existing tasks
       
-      for (let i = 1; i < args.length; i += 2) {
-        if (args[i] === '--start' && args[i + 1]) {
-          startTime = args[i + 1];
-        } else if (args[i] === '--end' && args[i + 1]) {
-          endTime = args[i + 1];
-        } else if (args[i] === '--tasks' && args[i + 1]) {
-          tasksString = args[i + 1];
+      for (let i = 1; i < args.length; i++) {
+        if (args[i] === '--append') {
+          appendMode = true;
+          continue; // Skip incrementing i since --append doesn't have a value
+        }
+        
+        // For flags with values
+        if (i + 1 < args.length) {
+          if (args[i] === '--start') {
+            startTime = args[i + 1];
+            i++; // Skip the value
+          } else if (args[i] === '--end') {
+            endTime = args[i + 1];
+            i++; // Skip the value
+          } else if (args[i] === '--tasks') {
+            tasksString = args[i + 1];
+            i++; // Skip the value
+          }
         }
       }
       
@@ -127,13 +142,38 @@ const today = formatDateForFile();
         return { title, durationMinutes };
       });
       
-      // Schedule tasks
-      const scheduledTasks = scheduleTasks(priorityTasks, startTime, endTime);
+      // Create new scheduled tasks
+      let scheduledTasks = scheduleTasks(priorityTasks, startTime, endTime);
+      
+      // If in append mode, fetch existing tasks and combine them
+      if (appendMode) {
+        try {
+          const existingTasks = await getTasks(today);
+          
+          // Only append if we got existing tasks
+          if (existingTasks && existingTasks.length > 0) {
+            // Renumber the newly scheduled tasks to continue from existing ones
+            scheduledTasks = scheduledTasks.map((task, index) => ({
+              ...task,
+              id: (existingTasks.length + index + 1).toString()
+            }));
+            
+            // Combine existing and new tasks
+            scheduledTasks = [...existingTasks, ...scheduledTasks];
+            
+            console.log(`Appending ${priorityTasks.length} tasks to ${existingTasks.length} existing tasks`);
+          } else {
+            console.log('No existing tasks found. Creating new task list.');
+          }
+        } catch (error) {
+          console.error('Error fetching existing tasks. Creating new task list instead:', error.message);
+        }
+      }
       
       // Save to server
       await setTasks(today, scheduledTasks);
       
-      console.log(`Successfully scheduled ${scheduledTasks.length} tasks for today (${today})`);
+      console.log(`Successfully ${appendMode ? 'updated' : 'scheduled'} ${scheduledTasks.length} tasks for today (${today})`);
       console.log('Tasks:');
       scheduledTasks.forEach(task => {
         console.log(`- ${task.title}: ${task.start} - ${task.end}`);
