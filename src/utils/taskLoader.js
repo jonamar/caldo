@@ -5,7 +5,7 @@
  */
 import axios from 'axios';
 
-const SERVER_URL = process.env.CALDO_SERVER_URL || 'http://localhost:3111';
+const SERVER_URL = process.env.CALDO_SERVER_URL || 'http://localhost:8422';
 
 export const loadTasksForDate = async (date) => {
   try {
