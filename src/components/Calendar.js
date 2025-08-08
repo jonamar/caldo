@@ -4,9 +4,7 @@ import {
   loadTasksForDate, 
   formatDateForFile, 
   saveTasksForDate,
-  createTask,
-  updateTask,
-  deleteTask 
+  clearTasksForDate 
 } from "../utils/taskLoader";
 import { calculateTimeRange } from '../utils/timeCalculations';
 import TimeGrid from './Calendar/TimeGrid';
@@ -81,7 +79,7 @@ function Calendar() {
     window.localStorage.removeItem('caldo_initialized');
     
     try {
-      await deleteTask(dateString, '*');
+      await clearTasksForDate(dateString);
     } catch (err) {
       console.log('Error clearing tasks from server:', err);
     }

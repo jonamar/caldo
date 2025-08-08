@@ -212,6 +212,21 @@ export const deleteTask = async (date, taskId) => {
 };
 
 /**
+ * Clears all tasks for a specific date on the server
+ * @param {string} date - Date in yy-mm-dd format
+ * @returns {Promise<boolean>} - Success status
+ */
+export const clearTasksForDate = async (date) => {
+  try {
+    await axios.delete(`${SERVER_URL}/tasks/${date}`);
+    return true;
+  } catch (error) {
+    console.error(`Error clearing tasks for ${date} on server:`, error);
+    return false;
+  }
+};
+
+/**
  * Saves tasks for a specific date to localStorage
  * @param {string} date - Date in yy-mm-dd format
  * @param {Array} tasks - Array of tasks to save

@@ -22,7 +22,7 @@
 const axios = require('axios');
 
 // Caldo server config
-const SERVER_URL = process.env.CALDO_SERVER_URL || 'http://localhost:3111';
+const SERVER_URL = process.env.CALDO_SERVER_URL || 'http://localhost:8422';
 
 // Helper functions for server API
 const getTasks = async (dateString) => {
