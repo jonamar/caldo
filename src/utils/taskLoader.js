@@ -5,7 +5,14 @@
  */
 import axios from 'axios';
 
-const SERVER_URL = process.env.CALDO_SERVER_URL || 'http://localhost:8422';
+// Determine server URL for both desktop and mobile access on LAN.
+// Prefer a build-time override via REACT_APP_CALDO_SERVER_URL (Create React App embeds these).
+// Otherwise, use the current host's hostname so phones on the same network can reach the server.
+const SERVER_URL =
+  process.env.REACT_APP_CALDO_SERVER_URL ||
+  (typeof window !== 'undefined' && window.location && window.location.hostname
+    ? `http://${window.location.hostname}:8422`
+    : 'http://localhost:8422');
 
 export const loadTasksForDate = async (date) => {
   try {
