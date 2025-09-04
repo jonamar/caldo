@@ -1,6 +1,6 @@
-# Mobile Calendar App
+# Caldo Mobile Calendar UI
 
-A simple, mobile-optimized React calendar web app that displays tasks with start and end times. Tasks can be checked off as they're completed, and the app visually represents task duration by sizing the task cards proportionally.
+A simple, mobile-optimized React calendar UI that displays tasks from the Caldo data server. Tasks show start/end times and scale visually with duration.
 
 ## Features
 
@@ -8,31 +8,30 @@ A simple, mobile-optimized React calendar web app that displays tasks with start
 - Tasks sized proportionally to their duration
 - Simple task check-off functionality
 - Clean UI using Tailwind CSS
-- LocalStorage-based data storage for easy task management
+- Server-backed storage with automatic localStorage fallback on first failed load
 - CLI tool for quick task updates
 
-## Getting Started
+## Quick Start
 
 ### Prerequisites
 
 - Node.js (v14 or higher)
 - npm or yarn
 
-### Installation
+From the `caldo-ui/` directory, start both the data server and the web UI:
 
-1. Clone the repository
-2. Install dependencies:
-   ```
-   npm install
-   ```
-3. Start the development server:
-   ```
-   npm start
-   ```
+```
+bash scripts/start-servers.sh
+```
+
+Defaults:
+- Data server: `http://localhost:8422`
+- Web UI: `http://localhost:8421`
 
 ## Data Storage
 
-The app uses localStorage to store task data. Each day's tasks are stored with keys in the format `tasks_yy-mm-dd` (e.g., `tasks_25-05-12` for May 12, 2025).
+- Server-first: tasks are loaded from and saved to the Caldo server at `http://localhost:8422` by default.
+- Fallback: on the very first failed server load, sample data is initialized into `localStorage` for today and tomorrow to allow offline viewing. Subsequent server operations will continue to target the server.
 
 ### Task Structure
 
@@ -78,14 +77,14 @@ updateTasksFromPriorities(priorities, '14:45', '16:30');
 
 ### 2. Command Line Interface (CLI)
 
-The app includes a CLI tool (`scripts/update-tasks.js`) that allows you to update tasks directly from the command line:
+Use `scripts/update-tasks.js` to update tasks via the server. Default server is `http://localhost:8422`. You can override with `CALDO_SERVER_URL`.
 
 #### Schedule Tasks Based on Priorities
 
 Automatically schedule tasks within a time window based on their durations:
 
 ```bash
-node scripts/update-tasks.js schedule --start "14:45" --end "16:30" --tasks "Apply to easy job application #1:15,Apply to easy job application #2:15,Apply to medium difficulty job application:30,Call the glasses store:15,Rest time:45"
+CALDO_SERVER_URL=http://localhost:8422 node scripts/update-tasks.js schedule --start "14:45" --end "16:30" --tasks "Apply to easy job application #1:15,Apply to easy job application #2:15,Apply to medium difficulty job application:30,Call the glasses store:15,Rest time:45"
 ```
 
 Format: `Task Title:DurationInMinutes,Task Title:DurationInMinutes,...`
@@ -95,7 +94,7 @@ Format: `Task Title:DurationInMinutes,Task Title:DurationInMinutes,...`
 Add new tasks to your day without replacing existing ones:
 
 ```bash
-node scripts/update-tasks.js schedule --append --start "16:30" --end "18:00" --tasks "Follow up on applications:20,Evening planning:15"
+CALDO_SERVER_URL=http://localhost:8422 node scripts/update-tasks.js schedule --append --start "16:30" --end "18:00" --tasks "Follow up on applications:20,Evening planning:15"
 ```
 
 Using the `--append` flag preserves all existing tasks for the day and adds the new tasks at the end.
@@ -105,7 +104,7 @@ Using the `--append` flag preserves all existing tasks for the day and adds the 
 Set specific tasks with exact start and end times:
 
 ```bash
-node scripts/update-tasks.js set --tasks '[{"title":"Task 1","start":"09:00","end":"10:00"},{"title":"Task 2","start":"10:30","end":"11:30"}]'
+CALDO_SERVER_URL=http://localhost:8422 node scripts/update-tasks.js set --tasks '[{"title":"Task 1","start":"09:00","end":"10:00"},{"title":"Task 2","start":"10:30","end":"11:30"}]'
 ```
 
 #### Clear All Tasks
@@ -113,22 +112,16 @@ node scripts/update-tasks.js set --tasks '[{"title":"Task 1","start":"09:00","en
 Remove all tasks for today:
 
 ```bash
-node scripts/update-tasks.js clear
+CALDO_SERVER_URL=http://localhost:8422 node scripts/update-tasks.js clear
 ```
 
 ### Example: Updating Today's Schedule
 
-To update today's tasks with a schedule for 2:45-4:30 PM:
-
 ```bash
-node scripts/update-tasks.js schedule --start "14:45" --end "16:30" --tasks "Apply to easy job application #1:15,Apply to easy job application #2:15,Apply to medium difficulty job application:30,Call the glasses store:15,Rest time:45"
+CALDO_SERVER_URL=http://localhost:8422 node scripts/update-tasks.js schedule --start "14:45" --end "16:30" --tasks "Apply to easy job application #1:15,Apply to easy job application #2:15,Apply to medium difficulty job application:30,Call the glasses store:15,Rest time:45"
 ```
 
-This will automatically:
-1. Create tasks with the specified titles
-2. Calculate appropriate start and end times within the given window
-3. Save them to localStorage
-4. Display the created schedule in the console
+This will create tasks in the server for today and display the scheduled blocks.
 
 ## License
 
