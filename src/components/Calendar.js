@@ -156,14 +156,35 @@ function Calendar() {
     const minutes = totalMinutes % 60;
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
   };
+
+  // Calculate time until 5pm
+  const getTimeUntil5pm = () => {
+    const now = new Date();
+    const today5pm = new Date();
+    today5pm.setHours(17, 0, 0, 0); // 5:00 PM
+    
+    const diffMs = today5pm - now;
+    
+    if (diffMs <= 0) {
+      return "Past 5pm";
+    }
+    
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (hours === 0) {
+      return `${minutes}m until 5pm`;
+    }
+    return `${hours}h ${minutes}m until 5pm`;
+  };
   
   return (
     <div className="w-full max-w-md space-y-0 relative">
       {/* Header Section */}
       <div className="mb-1 relative z-30">
         <div className="flex items-center relative">
-          <h2 className="text-sm font-medium text-gray-700 w-full text-center">
-            Today's Tasks
+          <h2 className="text-[0.6rem] text-gray-400 w-full text-center">
+            {getTimeUntil5pm()}
           </h2>
           <button 
             onClick={refreshTasks}
